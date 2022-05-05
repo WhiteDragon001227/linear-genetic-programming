@@ -1,5 +1,7 @@
+struct Registers<V>([V]);
+
 trait Operation<V> {
-    fn apply_operation(source: V, target: V) -> V;
+    fn apply_operation(registers: Registers<V>, source: V, target: V) -> ();
 }
 
 struct Instruction<V> {
@@ -7,12 +9,12 @@ struct Instruction<V> {
     target: V,
 }
 
-struct Program<'a, V, O>
+struct Program<V, O>
 where
     O: Operation<V>,
 {
-    instructions: &'a [O],
-    registers: &'a [V],
+    instructions: Vec<O>,
+    registers: [V],
 }
 
 fn main() {
