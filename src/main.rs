@@ -27,27 +27,29 @@
 #[derive(PartialEq, Eq, Debug)]
 struct Dimensions(u32, Option<u32>);
 
-struct Datum<DatumType, const SIZE: usize>([DatumType; SIZE]);
-struct Data<DatumType, const SIZE: usize>(Vec<Datum<DatumType, SIZE>>);
+struct Registers<RegisterType>(Vec<RegisterType>);
+struct Inputs<InputType>(Vec<Vec<InputType>>);
 
+// Concrete types (for testing purposes).
 struct Add;
 struct Subtract;
 struct Multiply;
+struct Divide;
 
-struct DataSet<InputType, RegisterType, const INPUT_SIZE: usize, const REGISTER_SIZE: usize> {
-    registers: Datum(),
+trait Operation<T> {
+    fn apply_operation(&self, data: T, source: i8, target: i8) -> T;
 }
 
-trait DataRetriever {}
+struct DataSet<InputType, RegisterType> {
+    registers: Registers<RegisterType>,
+    inputs: Inputs<InputType>,
+}
 
-//struct DataSet<InputType, RegisterType, > {
-//inputs: Inputs<InputType, Size>,
-//registers: Input<RegisterType,
-//}
-
-//trait Operation<T> {
-//fn apply_operation(data: Data, source: i8, target: i8) -> ();
-//}
+trait DataLoader {
+    fn get_data<InputType, RegisterType>(
+        data_set: DataSet<InputType, RegisterType>,
+    ) -> Box<dyn Operation<RegisterType>>;
+}
 
 //struct Instruction {
 //source: i8,
