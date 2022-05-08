@@ -23,12 +23,12 @@
 ///
 /// As demonstrated above, inputs can expand in another dimension (in the above case, its the #. of
 /// rows) as long as they share a dimension (in the above case, its the #. of columns)
+///
 
 #[derive(PartialEq, Eq, Debug)]
 struct Dimensions(u32, Option<u32>);
 
-struct Registers<RegisterType>(Vec<RegisterType>);
-struct Inputs<InputType>(Vec<Vec<InputType>>);
+struct Collection<ItemType>(Vec<ItemType>);
 
 // Concrete types (for testing purposes).
 struct Add;
@@ -36,52 +36,42 @@ struct Subtract;
 struct Multiply;
 struct Divide;
 
-trait Operation<T> {
-    fn apply_operation(&self, data: T, source: i8, target: i8) -> T;
+type InternalRegisters = Collection<f32>;
+
+enum DataSet<InputType> {
+    Register(InternalRegisters),
+    Input(Collection<InputType>),
 }
 
-struct DataSet<InputType, RegisterType> {
-    registers: Registers<RegisterType>,
-    inputs: Inputs<InputType>,
+trait Operation {
+    type InputType;
+
+    fn apply(&self, data_set: DataSet<Self::InputType>, source: i8, target: i8) -> ();
 }
 
-trait DataLoader {
-    fn get_data<InputType, RegisterType>(
-        data_set: DataSet<InputType, RegisterType>,
-    ) -> Box<dyn Operation<RegisterType>>;
+struct Instruction<InputType> {
+    source: i8,
+    target: i8,
+    mode: DataSet<InputType>,
 }
 
-//struct Instruction {
-//source: i8,
-//target: i8,
-//mode: Mode,
-//}
+struct Program<InputType> {
+    instructions: Vec<Box<dyn Operation<InputType = InputType>>>,
+    registers: InternalRegisters,
+    inputs: Collection<Collection<InputType>>,
+}
 
-//struct Program<
-//RegisterType,
-//OperationType,
-//InputType,
-//const NO_INSTRUCTIONS: usize,
-//const NO_REGISTERS: usize,
-//const NO_INPUTS: usize,
-//> where
-//OperationType: Operation,
-//{
-//instructions: [OperationType; INSTRUCTION_COUNT],
-//data: [Mode; { REGISTERS_COUNT + INPUT_SIZE }],
-//}
+trait GeneticProgramming {
+    fn init_population(pop_size: usize) -> ();
+    fn eval_fitness() -> Vec<f32>;
+    fn select_from_pop() -> ();
+    fn drop_from_pop() -> ();
+    fn breed() -> ();
+    fn compete() -> ();
+    fn run(n_generations: i8) -> ();
+}
 
-//trait GeneticProgramming {
-//fn init_population(pop_size: usize) -> ();
-//fn eval_fitness() -> Vec<f32>;
-//fn select_from_pop() -> ();
-//fn drop_from_pop() -> ();
-//fn breed() -> ();
-//fn compete() -> ();
-//fn run(n_generations: i8) -> ();
-//}
-
-//struct LinearGeneticProgramming {}
+struct LinearGeneticProgramming {}
 
 fn main() {
     println!("Hello, world!");
