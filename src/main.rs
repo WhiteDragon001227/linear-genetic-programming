@@ -1,6 +1,7 @@
 use core::fmt;
-use std::{path::Path, rc::Rc};
+use std::{path::Path, rc::Rc, u8};
 
+use csv::ReaderBuilder;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer,
@@ -44,16 +45,17 @@ use serde::{
 /// Notes:
 ///     Inputs should be referenced. (RC?)
 ///
-
 #[derive(Debug, Clone)]
 struct Collection<ItemType>(Vec<ItemType>);
-type Collections<ItemType> = Collection<Collection<ItemType>>;
 
 type Registers = Collection<f32>;
+type Inputs<InputType> = Collection<InputType>;
 
-trait InputTypeAttr: Clone + fmt::Debug + Into<Registers> {}
+trait InputTypeAttr: Clone + fmt::Debug + Into<Registers> {
+    type TrueType;
 
-impl InputTypeAttr for Registers {}
+    fn output_is_correct(&self, output_value: Self::TrueType) -> bool;
+}
 
 #[derive(Debug, Clone)]
 enum Exemplars<'a, InputType> {
@@ -61,7 +63,7 @@ enum Exemplars<'a, InputType> {
     Input(&'a Collection<InputType>),
 }
 
-trait Operation<InputType = Registers>: fmt::Debug
+trait Operation<InputType>: fmt::Debug
 where
     InputType: InputTypeAttr,
 {
@@ -97,7 +99,7 @@ where
 {
     instructions: Vec<Box<dyn Operation<InputType>>>,
     registers: Registers,
-    inputs: Rc<Collections<InputType>>,
+    inputs: Rc<Inputs<InputType>>,
 }
 
 struct HyperParameters {
@@ -112,15 +114,53 @@ where
 {
     hyper_parameters: HyperParameters,
     population: Collection<Program<InputType>>,
-    inputs: Collections<InputType>,
+    inputs: Inputs<InputType>,
 }
 
 struct Fitness(f32);
 
+impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
+    type InputType = IrisInput;
+
+    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType> {
+        let mut csv_reader = ReaderBuilder::new()
+            .has_headers(false)
+            .from_path(file_path)
+            .unwrap();
+
+        let raw_inputs: Vec<IrisInput> = csv_reader
+            .deserialize()
+            .map(|input| -> Self::InputType { input.unwrap() })
+            .collect();
+
+        return Collection(raw_inputs);
+    }
+
+    fn init(
+        &self,
+        hyper_parameters: HyperParameters,
+        inputs: Collection<Self::InputType>,
+    ) -> LinearGeneticProgramming<Self::InputType> {
+        todo!()
+    }
+
+    fn eval_fitness(&self) -> Collection<Fitness> {
+        todo!()
+    }
+
+    fn compete(&self, percentage: f32) -> Collection<Program<Self::InputType>> {
+        todo!()
+    }
+
+    fn run(&self) -> () {
+        todo!()
+    }
+}
+
 trait GeneticProgramming {
     type InputType: InputTypeAttr;
 
-    fn load_inputs(&self, file_path: &Path) -> Collections<Self::InputType>;
+    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
     fn init(
         &self,
         hyper_parameters: HyperParameters,
@@ -134,14 +174,14 @@ trait GeneticProgramming {
 const IRIS_DATASET_LINK: &'static str =
     "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum IrisClass {
     Setosa,
     Versicolour,
-    Virginica,
+    Virginica = 2,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct IrisInput {
     sepal_length: f32,
     sepal_width: f32,
@@ -149,6 +189,25 @@ struct IrisInput {
     petal_width: f32,
     #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
     class: IrisClass,
+}
+
+impl InputTypeAttr for IrisInput {
+    type TrueType = IrisClass;
+
+    fn output_is_correct(&self, output_value: Self::TrueType) -> bool {
+        output_value == self.class
+    }
+}
+
+impl Into<Registers> for IrisInput {
+    fn into(self) -> Registers {
+        return Collection(vec![
+            self.sepal_length,
+            self.sepal_width,
+            self.petal_length,
+            self.petal_width,
+        ]);
+    }
 }
 
 impl IrisInput {
