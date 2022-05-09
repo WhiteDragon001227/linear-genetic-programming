@@ -131,7 +131,9 @@ trait GeneticProgramming {
     fn run(&self) -> ();
 }
 
-// GET https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data
+const IRIS_DATASET_LINK: &'static str =
+    "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
+
 #[derive(Debug)]
 enum IrisClass {
     Setosa,
@@ -155,7 +157,7 @@ impl IrisInput {
         D: Deserializer<'de>,
     {
         const FIELDS: &'static [&'static str] =
-            &["Iris-setosa", "Iris-versicolour", "Iris-virginica"];
+            &["Iris-setosa", "Iris-versicolor", "Iris-virginica"];
 
         struct IrisClassVisitor;
 
@@ -172,7 +174,7 @@ impl IrisInput {
             {
                 match value {
                     "Iris-setosa" => Ok(IrisClass::Setosa),
-                    "Iris-versicolour" => Ok(IrisClass::Versicolour),
+                    "Iris-versicolor" => Ok(IrisClass::Versicolour),
                     "Iris-virginica" => Ok(IrisClass::Virginica),
                     _ => Err(de::Error::unknown_field(value, FIELDS)),
                 }
@@ -185,4 +187,35 @@ impl IrisInput {
 
 fn main() {
     println!("Hello, world!");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn given_iris_dataset_when_csv_is_read_then_rows_are_deserialized_as_structs(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let response = reqwest::get(IRIS_DATASET_LINK).await?;
+        let content = response.text().await?;
+
+        assert_ne!(content.len(), 0);
+
+        let content_bytes = content.as_bytes();
+
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(content_bytes);
+
+        let data = reader.deserialize();
+
+        for result in data {
+            let record: IrisInput = result?;
+            println!("{:?}", record)
+        }
+
+        Ok(())
+    }
 }
