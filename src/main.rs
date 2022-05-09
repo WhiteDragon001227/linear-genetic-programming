@@ -1,5 +1,5 @@
 use core::fmt;
-use std::rc::Rc;
+use std::{path::Path, rc::Rc};
 
 /// Lets describe the steps we're trying to execuet.
 ///
@@ -33,38 +33,48 @@ use std::rc::Rc;
 ///     3. Eval Fitness
 ///     4. Drop x%
 ///     5. Clone 1 - x %
-///     6. Repeat from 3
+///     6. Repeat from 3 until best == median == worst
 ///
 ///
 /// Notes:
 ///     Inputs should be referenced. (RC?)
 ///
 
-#[derive(PartialEq, Eq, Debug)]
-struct Dimensions(u32, Option<u32>);
-
 #[derive(Debug, Clone)]
 struct Collection<ItemType>(Vec<ItemType>);
+type Collections<ItemType> = Collection<Collection<ItemType>>;
 
-type InternalRegisters = Collection<f32>;
+type Registers = Collection<f32>;
+
+trait InputTypeAttr: Clone + fmt::Debug + Into<Registers> {}
+
+impl InputTypeAttr for Registers {}
 
 #[derive(Debug, Clone)]
 enum Exemplars<'a, InputType> {
-    Register(&'a InternalRegisters),
+    Register(&'a Registers),
     Input(&'a Collection<InputType>),
 }
 
-trait Operation<InputType = InternalRegisters>: fmt::Debug
+trait Operation<InputType = Registers>: fmt::Debug
 where
-    InputType: Clone + fmt::Debug,
+    InputType: InputTypeAttr,
 {
     fn apply(
         &self,
         data_set: Exemplars<InputType>,
-        registers: InternalRegisters,
+        registers: Registers,
         source: i8,
         target: i8,
     ) -> ();
+
+    fn clone_dyn(&self) -> Box<dyn Operation<InputType>>;
+}
+
+impl<T: InputTypeAttr> Clone for Box<dyn Operation<T>> {
+    fn clone(&self) -> Self {
+        self.clone_dyn()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -72,38 +82,64 @@ struct Instruction<'a, InputType> {
     source: i8,
     target: i8,
     mode: &'a Exemplars<'a, InputType>,
-    registers: &'a InternalRegisters,
+    registers: &'a Registers,
 }
 
 #[derive(Debug)]
 struct Program<InputType>
 where
-    InputType: Clone + fmt::Debug,
+    InputType: InputTypeAttr,
 {
     instructions: Vec<Box<dyn Operation<InputType>>>,
-    registers: InternalRegisters,
-    inputs: Rc<Collection<Collection<InputType>>>,
+    registers: Registers,
+    inputs: Rc<Collections<InputType>>,
 }
 
-impl<'a, T> Clone for Program<T>
-where
-    T: Clone + fmt::Debug,
-{
-    fn clone(&self) -> Self {
-        todo!()
-    }
+struct HyperParameters {
+    population_size: usize,
+    n_generations: i8,
+    selection_dropout: f32,
 }
+
+struct LinearGeneticProgramming<InputType>
+where
+    InputType: InputTypeAttr,
+{
+    hyper_parameters: HyperParameters,
+    population: Collection<Program<InputType>>,
+    inputs: Collections<InputType>,
+}
+
+struct Fitness(f32);
 
 trait GeneticProgramming {
-    fn init_population(pop_size: usize) -> ();
-    fn eval_fitness() -> Vec<f32>;
-    fn select_from_pop(percentage: f32) -> ();
-    fn breed() -> ();
-    fn compete() -> ();
-    fn run(n_generations: i8) -> ();
+    type InputType: InputTypeAttr;
+
+    fn load_inputs(&self, file_path: &Path) -> Collections<Self::InputType>;
+    fn init(
+        &self,
+        hyper_parameters: HyperParameters,
+        inputs: Collection<Self::InputType>,
+    ) -> LinearGeneticProgramming<Self::InputType>;
+    fn eval_fitness(&self) -> Collection<Fitness>;
+    fn compete(&self, percentage: f32) -> Collection<Program<Self::InputType>>;
+    fn run(&self) -> ();
 }
 
-struct LinearGeneticProgramming {}
+// GET https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data
+enum IrisClass {
+    Setosa,
+    Versicolour,
+    Virginica,
+}
+
+struct IrisInput {
+    sepal_length: f32,
+    sepal_width: f32,
+    petal_length: f32,
+    petal_width: f32,
+    class: IrisClass,
+}
 
 fn main() {
     println!("Hello, world!");
