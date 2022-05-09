@@ -1,6 +1,11 @@
 use core::fmt;
 use std::{path::Path, rc::Rc};
 
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer,
+};
+
 /// Lets describe the steps we're trying to execuet.
 ///
 /// First we initialize a population of programs.
@@ -127,18 +132,55 @@ trait GeneticProgramming {
 }
 
 // GET https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data
+#[derive(Debug)]
 enum IrisClass {
     Setosa,
     Versicolour,
     Virginica,
 }
 
+#[derive(Deserialize, Debug)]
 struct IrisInput {
     sepal_length: f32,
     sepal_width: f32,
     petal_length: f32,
     petal_width: f32,
+    #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
     class: IrisClass,
+}
+
+impl IrisInput {
+    fn deserialize_iris_class<'de, D>(deserializer: D) -> Result<IrisClass, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        const FIELDS: &'static [&'static str] =
+            &["Iris-setosa", "Iris-versicolour", "Iris-virginica"];
+
+        struct IrisClassVisitor;
+
+        impl<'de> Visitor<'de> for IrisClassVisitor {
+            type Value = IrisClass;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(&FIELDS.join(" or "))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<IrisClass, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "Iris-setosa" => Ok(IrisClass::Setosa),
+                    "Iris-versicolour" => Ok(IrisClass::Versicolour),
+                    "Iris-virginica" => Ok(IrisClass::Virginica),
+                    _ => Err(de::Error::unknown_field(value, FIELDS)),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(IrisClassVisitor)
+    }
 }
 
 fn main() {
