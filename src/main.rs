@@ -92,7 +92,7 @@ struct Instruction<'a, InputType> {
     registers: &'a Registers,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Program<InputType>
 where
     InputType: InputTypeAttr,
@@ -102,12 +102,14 @@ where
     inputs: Rc<Inputs<InputType>>,
 }
 
+#[derive(Debug, Clone)]
 struct HyperParameters {
     population_size: usize,
     n_generations: i8,
     selection_dropout: f32,
 }
 
+#[derive(Clone, Debug)]
 struct LinearGeneticProgramming<InputType>
 where
     InputType: InputTypeAttr,
@@ -122,7 +124,7 @@ struct Fitness(f32);
 impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
     type InputType = IrisInput;
 
-    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType> {
+    fn load_inputs(&self, file_path: &Path) -> LinearGeneticProgramming<Self::InputType> {
         let mut csv_reader = ReaderBuilder::new()
             .has_headers(false)
             .from_path(file_path)
@@ -133,7 +135,12 @@ impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
             .map(|input| -> Self::InputType { input.unwrap() })
             .collect();
 
-        return Collection(raw_inputs);
+        let inputs = Collection(raw_inputs);
+
+        return LinearGeneticProgramming {
+            inputs,
+            ..self.clone()
+        };
     }
 
     fn init(
@@ -144,15 +151,15 @@ impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
         todo!()
     }
 
-    fn eval_fitness(&self) -> Collection<Fitness> {
+    fn eval_fitness(&self) -> LinearGeneticProgramming<Self::InputType> {
         todo!()
     }
 
-    fn compete(&self, percentage: f32) -> Collection<Program<Self::InputType>> {
+    fn compete(&self, percentage: f32) -> LinearGeneticProgramming<Self::InputType> {
         todo!()
     }
 
-    fn run(&self) -> () {
+    fn run(&self) -> LinearGeneticProgramming<Self::InputType> {
         todo!()
     }
 }
@@ -160,15 +167,15 @@ impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
 trait GeneticProgramming {
     type InputType: InputTypeAttr;
 
-    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
+    fn load_inputs(&self, file_path: &Path) -> LinearGeneticProgramming<Self::InputType>;
     fn init(
         &self,
         hyper_parameters: HyperParameters,
         inputs: Collection<Self::InputType>,
     ) -> LinearGeneticProgramming<Self::InputType>;
-    fn eval_fitness(&self) -> Collection<Fitness>;
-    fn compete(&self, percentage: f32) -> Collection<Program<Self::InputType>>;
-    fn run(&self) -> ();
+    fn eval_fitness(&self) -> LinearGeneticProgramming<Self::InputType>;
+    fn compete(&self, percentage: f32) -> LinearGeneticProgramming<Self::InputType>;
+    fn run(&self) -> LinearGeneticProgramming<Self::InputType>;
 }
 
 const IRIS_DATASET_LINK: &'static str =
@@ -275,6 +282,12 @@ mod tests {
             println!("{:?}", record)
         }
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
+    ) -> Result<(), Box<dyn error::Error>> {
         Ok(())
     }
 }
