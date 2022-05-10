@@ -114,6 +114,7 @@ where
     inputs: Rc<Inputs<InputType>>,
 }
 
+struct Fitness(f32);
 trait Auditable {
     fn eval_fitness(&self) -> Fitness;
 }
@@ -158,8 +159,6 @@ where
         };
     }
 }
-
-struct Fitness(f32);
 
 // TODO: Document usage.
 struct TestLGP;
@@ -286,18 +285,23 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use std::error;
+    use std::{error, io::Write};
 
     use tempfile::NamedTempFile;
 
     use super::*;
 
-    #[tokio::test]
-    async fn given_iris_dataset_when_csv_is_read_then_rows_are_deserialized_as_structs(
-    ) -> Result<(), Box<dyn error::Error>> {
+    async fn get_iris_content() -> Result<String, Box<dyn error::Error>> {
         let response = reqwest::get(IRIS_DATASET_LINK).await?;
         let content = response.text().await?;
 
+        Ok(content)
+    }
+
+    #[tokio::test]
+    async fn given_iris_dataset_when_csv_is_read_then_rows_are_deserialized_as_structs(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let content = get_iris_content().await?;
         assert_ne!(content.len(), 0);
 
         let content_bytes = content.as_bytes();
@@ -323,6 +327,8 @@ mod tests {
     async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
     ) -> Result<(), Box<dyn error::Error>> {
         let tmpfile = NamedTempFile::new()?;
+        let content = get_iris_content().await?;
+        writeln!(&tmpfile, "{}", &content)?;
         let test_lgp = TestLGP;
         let Inputs(Collection(inputs)) = Runnable::load_inputs(&test_lgp, tmpfile.path());
         assert_ne!(inputs.len(), 0);
