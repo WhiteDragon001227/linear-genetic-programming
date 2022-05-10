@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{path::Path, rc::Rc, u8};
+use std::{fmt::Debug, path::Path, rc::Rc, u8};
 
 use csv::ReaderBuilder;
 use serde::{
@@ -35,9 +35,9 @@ use serde::{
 ///
 /// Smoke Test Algorithm:
 ///     1. Load input data
-///     2. Generate programs (instructions, registers, etc..) -- Init Popuulation
+///     2. Generate programs (instructions, registers, etc..) -- Init Population
 ///     3. Eval Fitness
-///     4. Drop x%
+///     4. Drop x% (tournament selection)
 ///     5. Clone 1 - x %
 ///     6. Repeat from 3 until best == median == worst
 ///
@@ -51,7 +51,12 @@ struct Collection<ItemType>(Vec<ItemType>);
 type Registers = Collection<f32>;
 type Inputs<InputType> = Collection<InputType>;
 
-trait InputTypeAttr: Clone + fmt::Debug + Into<Registers> {
+trait Verifiable: PartialEq + Eq + Debug {}
+
+trait ArrayConvertable: Clone + fmt::Debug + Into<Registers>
+where
+    Self::TrueType: Verifiable,
+{
     type TrueType;
 
     fn output_is_correct(&self, output_value: Self::TrueType) -> bool;
@@ -63,9 +68,9 @@ enum Exemplars<'a, InputType> {
     Input(&'a Collection<InputType>),
 }
 
-trait Operation<InputType>: fmt::Debug
+trait Operable<InputType>: fmt::Debug
 where
-    InputType: InputTypeAttr,
+    InputType: ArrayConvertable,
 {
     fn apply(
         &self,
@@ -75,10 +80,10 @@ where
         target: i8,
     ) -> ();
 
-    fn clone_dyn(&self) -> Box<dyn Operation<InputType>>;
+    fn clone_dyn(&self) -> Box<dyn Operable<InputType>>;
 }
 
-impl<T: InputTypeAttr> Clone for Box<dyn Operation<T>> {
+impl<T: ArrayConvertable> Clone for Box<dyn Operable<T>> {
     fn clone(&self) -> Self {
         self.clone_dyn()
     }
@@ -95,11 +100,15 @@ struct Instruction<'a, InputType> {
 #[derive(Debug, Clone)]
 struct Program<InputType>
 where
-    InputType: InputTypeAttr,
+    InputType: ArrayConvertable,
 {
-    instructions: Vec<Box<dyn Operation<InputType>>>,
+    instructions: Vec<Box<dyn Operable<InputType>>>,
     registers: Registers,
     inputs: Rc<Inputs<InputType>>,
+}
+
+trait Auditable {
+    fn eval_fitness(&self) -> Fitness;
 }
 
 #[derive(Debug, Clone)]
@@ -109,22 +118,37 @@ struct HyperParameters {
     selection_dropout: f32,
 }
 
+#[derive(Debug, Clone)]
+struct Population<InputType: ArrayConvertable>(Collection<Program<InputType>>);
+
 #[derive(Clone, Debug)]
 struct LinearGeneticProgramming<InputType>
 where
-    InputType: InputTypeAttr,
+    InputType: ArrayConvertable,
 {
     hyper_parameters: HyperParameters,
-    population: Collection<Program<InputType>>,
+    population: Population<InputType>,
     inputs: Inputs<InputType>,
+}
+
+impl<InputType> LinearGeneticProgramming<InputType>
+where
+    InputType: ArrayConvertable,
+{
+    fn new(lgp: impl Runnable) -> LinearGeneticProgramming<InputType> {
+        todo!()
+    }
 }
 
 struct Fitness(f32);
 
-impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
+// TODO: Document usage.
+struct LGP;
+
+impl Runnable for LinearGeneticProgramming<IrisInput> {
     type InputType = IrisInput;
 
-    fn load_inputs(&self, file_path: &Path) -> LinearGeneticProgramming<Self::InputType> {
+    fn load_inputs(&self, file_path: &Path) -> Collection<Self::InputType> {
         let mut csv_reader = ReaderBuilder::new()
             .has_headers(false)
             .from_path(file_path)
@@ -137,45 +161,17 @@ impl GeneticProgramming for LinearGeneticProgramming<IrisInput> {
 
         let inputs = Collection(raw_inputs);
 
-        return LinearGeneticProgramming {
-            inputs,
-            ..self.clone()
-        };
-    }
-
-    fn init(
-        &self,
-        hyper_parameters: HyperParameters,
-        inputs: Collection<Self::InputType>,
-    ) -> LinearGeneticProgramming<Self::InputType> {
-        todo!()
-    }
-
-    fn eval_fitness(&self) -> LinearGeneticProgramming<Self::InputType> {
-        todo!()
-    }
-
-    fn compete(&self, percentage: f32) -> LinearGeneticProgramming<Self::InputType> {
-        todo!()
-    }
-
-    fn run(&self) -> LinearGeneticProgramming<Self::InputType> {
-        todo!()
+        return inputs;
     }
 }
 
-trait GeneticProgramming {
-    type InputType: InputTypeAttr;
+trait Runnable {
+    type InputType: ArrayConvertable;
 
-    fn load_inputs(&self, file_path: &Path) -> LinearGeneticProgramming<Self::InputType>;
-    fn init(
-        &self,
-        hyper_parameters: HyperParameters,
-        inputs: Collection<Self::InputType>,
-    ) -> LinearGeneticProgramming<Self::InputType>;
-    fn eval_fitness(&self) -> LinearGeneticProgramming<Self::InputType>;
-    fn compete(&self, percentage: f32) -> LinearGeneticProgramming<Self::InputType>;
-    fn run(&self) -> LinearGeneticProgramming<Self::InputType>;
+    fn load_inputs(&self, file_path: &Path) -> Collection<Self::InputType>;
+    fn generate_population(&self, size: usize) -> Collection<Program<Self::InputType>>;
+    fn compete(&self, retention_percent: f32) -> Collection<Program<Self::InputType>>;
+    fn run(&self) -> ();
 }
 
 const IRIS_DATASET_LINK: &'static str =
@@ -198,7 +194,7 @@ struct IrisInput {
     class: IrisClass,
 }
 
-impl InputTypeAttr for IrisInput {
+impl ArrayConvertable for IrisInput {
     type TrueType = IrisClass;
 
     fn output_is_correct(&self, output_value: Self::TrueType) -> bool {
@@ -276,11 +272,14 @@ mod tests {
             .from_reader(content_bytes);
 
         let data = reader.deserialize();
+        let mut count = 0;
 
         for result in data {
-            let record: IrisInput = result?;
-            println!("{:?}", record)
+            let _record: IrisInput = result?;
+            count += 1;
         }
+
+        assert_ne!(count, 0);
 
         Ok(())
     }
