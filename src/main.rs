@@ -163,14 +163,26 @@ impl Runnable for LinearGeneticProgramming<IrisInput> {
 
         return inputs;
     }
+
+    fn generate_population(&self, size: usize) -> Population<Self::InputType> {
+        todo!()
+    }
+
+    fn compete(&self, retention_percent: f32) -> Population<Self::InputType> {
+        todo!()
+    }
+
+    fn run(&self) -> () {
+        todo!()
+    }
 }
 
 trait Runnable {
     type InputType: ArrayConvertable;
 
-    fn load_inputs(&self, file_path: &Path) -> Collection<Self::InputType>;
-    fn generate_population(&self, size: usize) -> Collection<Program<Self::InputType>>;
-    fn compete(&self, retention_percent: f32) -> Collection<Program<Self::InputType>>;
+    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
+    fn generate_population(&self, size: usize) -> Population<Self::InputType>;
+    fn compete(&self, retention_percent: f32) -> Population<Self::InputType>;
     fn run(&self) -> ();
 }
 
