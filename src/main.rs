@@ -1,5 +1,10 @@
 use core::fmt;
-use std::{fmt::Debug, path::Path, rc::Rc, u8};
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+    rc::Rc,
+    u8,
+};
 
 use csv::ReaderBuilder;
 use serde::{
@@ -49,7 +54,9 @@ use serde::{
 struct Collection<ItemType>(Vec<ItemType>);
 
 type Registers = Collection<f32>;
-type Inputs<InputType> = Collection<InputType>;
+
+#[derive(Debug, Clone)]
+struct Inputs<InputType: ArrayConvertable>(Collection<InputType>);
 
 trait Verifiable: PartialEq + Eq + Debug {}
 
@@ -116,6 +123,7 @@ struct HyperParameters {
     population_size: usize,
     n_generations: i8,
     selection_dropout: f32,
+    input_file_path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -135,20 +143,31 @@ impl<InputType> LinearGeneticProgramming<InputType>
 where
     InputType: ArrayConvertable,
 {
-    fn new(lgp: impl Runnable) -> LinearGeneticProgramming<InputType> {
-        todo!()
+    fn new<T>(lgp: T, hyper_parameters: HyperParameters) -> LinearGeneticProgramming<T::InputType>
+    where
+        T: Runnable,
+        T::InputType: ArrayConvertable,
+    {
+        let inputs = lgp.load_inputs(&hyper_parameters.input_file_path);
+        let population = lgp.init_population(hyper_parameters.population_size);
+
+        return LinearGeneticProgramming {
+            inputs,
+            population,
+            hyper_parameters,
+        };
     }
 }
 
 struct Fitness(f32);
 
 // TODO: Document usage.
-struct LGP;
+struct TestLGP;
 
-impl Runnable for LinearGeneticProgramming<IrisInput> {
+impl Runnable for TestLGP {
     type InputType = IrisInput;
 
-    fn load_inputs(&self, file_path: &Path) -> Collection<Self::InputType> {
+    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType> {
         let mut csv_reader = ReaderBuilder::new()
             .has_headers(false)
             .from_path(file_path)
@@ -161,10 +180,10 @@ impl Runnable for LinearGeneticProgramming<IrisInput> {
 
         let inputs = Collection(raw_inputs);
 
-        return inputs;
+        return Inputs(inputs);
     }
 
-    fn generate_population(&self, size: usize) -> Population<Self::InputType> {
+    fn init_population(&self, size: usize) -> Population<Self::InputType> {
         todo!()
     }
 
@@ -172,7 +191,7 @@ impl Runnable for LinearGeneticProgramming<IrisInput> {
         todo!()
     }
 
-    fn run(&self) -> () {
+    fn run(&self, n_generations: usize) -> () {
         todo!()
     }
 }
@@ -181,9 +200,9 @@ trait Runnable {
     type InputType: ArrayConvertable;
 
     fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
-    fn generate_population(&self, size: usize) -> Population<Self::InputType>;
+    fn init_population(&self, size: usize) -> Population<Self::InputType>;
     fn compete(&self, retention_percent: f32) -> Population<Self::InputType>;
-    fn run(&self) -> ();
+    fn run(&self, n_generations: usize) -> ();
 }
 
 const IRIS_DATASET_LINK: &'static str =
@@ -195,6 +214,8 @@ enum IrisClass {
     Versicolour,
     Virginica = 2,
 }
+
+impl Verifiable for IrisClass {}
 
 #[derive(Deserialize, Debug, Clone)]
 struct IrisInput {
@@ -267,6 +288,8 @@ fn main() {
 mod tests {
     use std::error;
 
+    use tempfile::NamedTempFile;
+
     use super::*;
 
     #[tokio::test]
@@ -299,6 +322,10 @@ mod tests {
     #[tokio::test]
     async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
     ) -> Result<(), Box<dyn error::Error>> {
+        let tmpfile = NamedTempFile::new()?;
+        let test_lgp = TestLGP;
+        let Inputs(Collection(inputs)) = Runnable::load_inputs(&test_lgp, tmpfile.path());
+        assert_ne!(inputs.len(), 0);
         Ok(())
     }
 }
