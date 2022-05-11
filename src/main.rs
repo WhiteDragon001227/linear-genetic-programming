@@ -50,17 +50,28 @@ use serde::{
 /// Notes:
 ///     Inputs should be referenced. (RC?)
 ///
+struct TestLGP;
+
+const IRIS_DATASET_LINK: &'static str =
+    "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
+
 #[derive(Debug, Clone)]
 struct Collection<ItemType>(Vec<ItemType>);
 
-type Registers = Collection<f32>;
+#[derive(Debug, Clone)]
+struct Registers(Collection<f32>);
 
 #[derive(Debug, Clone)]
-struct Inputs<InputType: ArrayConvertable>(Collection<InputType>);
+struct Inputs<InputType: VectorConvertable>(Collection<InputType>);
 
+#[derive(Debug, Clone)]
+struct Fitness(f32);
+
+trait Auditable {
+    fn eval_fitness(&self) -> Fitness;
+}
 trait Verifiable: PartialEq + Eq + Debug {}
-
-trait ArrayConvertable: Clone + fmt::Debug + Into<Registers>
+trait VectorConvertable: Clone + fmt::Debug + Into<Registers>
 where
     Self::TrueType: Verifiable,
 {
@@ -70,14 +81,17 @@ where
 }
 
 #[derive(Debug, Clone)]
-enum Exemplars<'a, InputType> {
+enum Exemplars<'a, InputType>
+where
+    InputType: VectorConvertable,
+{
     Register(&'a Registers),
-    Input(&'a Collection<InputType>),
+    Input(&'a InputType),
 }
 
 trait Operable<InputType>: fmt::Debug
 where
-    InputType: ArrayConvertable,
+    InputType: VectorConvertable,
 {
     fn apply(
         &self,
@@ -87,17 +101,20 @@ where
         target: i8,
     ) -> ();
 
-    fn clone_dyn(&self) -> Box<dyn Operable<InputType>>;
+    fn dyn_clone(&self) -> Box<dyn Operable<InputType>>;
 }
 
-impl<T: ArrayConvertable> Clone for Box<dyn Operable<T>> {
+impl<T: VectorConvertable> Clone for Box<dyn Operable<T>> {
     fn clone(&self) -> Self {
-        self.clone_dyn()
+        self.dyn_clone()
     }
 }
 
 #[derive(Clone, Debug)]
-struct Instruction<'a, InputType> {
+struct Instruction<'a, InputType>
+where
+    InputType: VectorConvertable,
+{
     source: i8,
     target: i8,
     mode: &'a Exemplars<'a, InputType>,
@@ -107,16 +124,23 @@ struct Instruction<'a, InputType> {
 #[derive(Debug, Clone)]
 struct Program<InputType>
 where
-    InputType: ArrayConvertable,
+    InputType: VectorConvertable,
 {
     instructions: Vec<Box<dyn Operable<InputType>>>,
     registers: Registers,
     inputs: Rc<Inputs<InputType>>,
 }
 
-struct Fitness(f32);
-trait Auditable {
-    fn eval_fitness(&self) -> Fitness;
+trait Executable
+where
+    Self::InputType: VectorConvertable,
+{
+    type InputType;
+
+    fn get_input(&self) -> Option<Self::InputType>;
+    fn get_registers(&self) -> Registers;
+    fn get_instructions(&self) -> Vec<Box<dyn Operable<Self::InputType>>>;
+    fn dyn_clone(&self) -> Box<dyn Executable<InputType = Self::InputType>>;
 }
 
 #[derive(Debug, Clone)]
@@ -127,13 +151,24 @@ struct HyperParameters {
     input_file_path: PathBuf,
 }
 
+impl<InputType> Clone for Box<dyn Executable<InputType = InputType>>
+where
+    InputType: VectorConvertable,
+{
+    fn clone(&self) -> Self {
+        return self.dyn_clone();
+    }
+}
+
 #[derive(Debug, Clone)]
-struct Population<InputType: ArrayConvertable>(Collection<Program<InputType>>);
+struct Population<InputType: VectorConvertable>(
+    Collection<Box<dyn Executable<InputType = InputType>>>,
+);
 
 #[derive(Clone, Debug)]
 struct LinearGeneticProgramming<InputType>
 where
-    InputType: ArrayConvertable,
+    InputType: VectorConvertable,
 {
     hyper_parameters: HyperParameters,
     population: Population<InputType>,
@@ -142,12 +177,12 @@ where
 
 impl<InputType> LinearGeneticProgramming<InputType>
 where
-    InputType: ArrayConvertable,
+    InputType: VectorConvertable,
 {
     fn new<T>(lgp: T, hyper_parameters: HyperParameters) -> LinearGeneticProgramming<T::InputType>
     where
         T: Runnable,
-        T::InputType: ArrayConvertable,
+        T::InputType: VectorConvertable,
     {
         let inputs = lgp.load_inputs(&hyper_parameters.input_file_path);
         let population = lgp.init_population(hyper_parameters.population_size);
@@ -159,9 +194,6 @@ where
         };
     }
 }
-
-// TODO: Document usage.
-struct TestLGP;
 
 impl Runnable for TestLGP {
     type InputType = IrisInput;
@@ -193,19 +225,21 @@ impl Runnable for TestLGP {
     fn run(&self, n_generations: usize) -> () {
         todo!()
     }
+
+    fn generate_individual(&self) -> Program<Self::InputType> {
+        todo!()
+    }
 }
 
 trait Runnable {
-    type InputType: ArrayConvertable;
+    type InputType: VectorConvertable;
 
     fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
+    fn generate_individual(&self) -> Program<Self::InputType>;
     fn init_population(&self, size: usize) -> Population<Self::InputType>;
     fn compete(&self, retention_percent: f32) -> Population<Self::InputType>;
     fn run(&self, n_generations: usize) -> ();
 }
-
-const IRIS_DATASET_LINK: &'static str =
-    "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum IrisClass {
@@ -226,7 +260,7 @@ struct IrisInput {
     class: IrisClass,
 }
 
-impl ArrayConvertable for IrisInput {
+impl VectorConvertable for IrisInput {
     type TrueType = IrisClass;
 
     fn output_is_correct(&self, output_value: Self::TrueType) -> bool {
@@ -236,12 +270,12 @@ impl ArrayConvertable for IrisInput {
 
 impl Into<Registers> for IrisInput {
     fn into(self) -> Registers {
-        return Collection(vec![
+        return Registers(Collection(vec![
             self.sepal_length,
             self.sepal_width,
             self.petal_length,
             self.petal_width,
-        ]);
+        ]));
     }
 }
 
