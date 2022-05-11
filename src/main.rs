@@ -50,6 +50,13 @@ use serde::{
 /// Notes:
 ///     Inputs should be referenced. (RC?)
 ///
+/// Fitness Algorithm:
+///     For every input:
+///         run all instructions
+///         argmax(instructions) == correct_val
+///         reset registers
+///     Fitness Score = # of correct / # of inputs.
+///
 struct TestLGP;
 
 const IRIS_DATASET_LINK: &'static str =
@@ -80,19 +87,21 @@ where
     fn output_is_correct(&self, output_value: Self::TrueType) -> bool;
 }
 
-trait Operable<InputType>: fmt::Debug
+trait Operable: fmt::Debug
 where
-    InputType: VectorConvertable,
+    Self::InputType: VectorConvertable,
 {
-    fn apply(
-        &self,
-        data_set: Exemplars<InputType>,
-        registers: Registers,
-        source: i8,
-        target: i8,
-    ) -> ();
+    type InputType;
 
-    fn dyn_clone(&self) -> Box<dyn Operable<InputType>>;
+    fn exec(&self) -> ();
+
+    // Accessors.
+    fn get_source_index(&self) -> i8;
+    fn get_target_index(&self) -> i8;
+    fn get_registers(&self) -> Registers;
+    fn get_data(&self) -> Exemplars<Self::InputType>;
+
+    fn dyn_clone(&self) -> Box<dyn Operable<InputType = Self::InputType>>;
 }
 
 trait Executable: fmt::Debug + Auditable
@@ -102,8 +111,7 @@ where
     type InputType;
 
     fn get_input(&self) -> Option<Self::InputType>;
-    fn get_registers(&self) -> Registers;
-    fn get_instructions(&self) -> Vec<Box<dyn Operable<Self::InputType>>>;
+    fn get_instructions(&self) -> Vec<Box<dyn Operable<InputType = Self::InputType>>>;
     fn dyn_clone(&self) -> Box<dyn Executable<InputType = Self::InputType>>;
 }
 
@@ -130,7 +138,7 @@ where
     Input(&'a InputType),
 }
 
-impl<T: VectorConvertable> Clone for Box<dyn Operable<T>> {
+impl<T: VectorConvertable> Clone for Box<dyn Operable<InputType = T>> {
     fn clone(&self) -> Self {
         self.dyn_clone()
     }
@@ -152,14 +160,22 @@ struct Program<InputType>
 where
     InputType: VectorConvertable,
 {
-    instructions: Vec<Box<dyn Operable<InputType>>>,
-    registers: Registers,
+    instructions: Vec<Box<dyn Operable<InputType = InputType>>>,
     inputs: Rc<Inputs<InputType>>,
 }
 
 impl Auditable for Program<IrisInput> {
     fn eval_fitness(&self) -> Fitness {
-        todo!()
+        /*
+         *for Inputs(input in &self.inputs {
+         *    let mut registers = Collection(Vec::new());
+         *    for instruction in &self.instructions {
+         *        instruction.apply(input, Registers(registers), 0, 1);
+         *    }
+         *}
+         */
+
+        return Fitness(0.);
     }
 }
 
@@ -170,11 +186,7 @@ impl Executable for Program<IrisInput> {
         todo!()
     }
 
-    fn get_registers(&self) -> Registers {
-        todo!()
-    }
-
-    fn get_instructions(&self) -> Vec<Box<dyn Operable<Self::InputType>>> {
+    fn get_instructions(&self) -> Vec<Box<dyn Operable<InputType = Self::InputType>>> {
         todo!()
     }
 
