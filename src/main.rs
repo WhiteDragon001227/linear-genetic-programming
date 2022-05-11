@@ -67,10 +67,10 @@ struct Inputs<InputType: VectorConvertable>(Collection<InputType>);
 #[derive(Debug, Clone)]
 struct Fitness(f32);
 
+trait Verifiable: PartialEq + Eq + Debug {}
 trait Auditable {
     fn eval_fitness(&self) -> Fitness;
 }
-trait Verifiable: PartialEq + Eq + Debug {}
 trait VectorConvertable: Clone + fmt::Debug + Into<Registers>
 where
     Self::TrueType: Verifiable,
@@ -78,15 +78,6 @@ where
     type TrueType;
 
     fn output_is_correct(&self, output_value: Self::TrueType) -> bool;
-}
-
-#[derive(Debug, Clone)]
-enum Exemplars<'a, InputType>
-where
-    InputType: VectorConvertable,
-{
-    Register(&'a Registers),
-    Input(&'a InputType),
 }
 
 trait Operable<InputType>: fmt::Debug
@@ -102,6 +93,41 @@ where
     ) -> ();
 
     fn dyn_clone(&self) -> Box<dyn Operable<InputType>>;
+}
+
+trait Executable: fmt::Debug + Auditable
+where
+    Self::InputType: VectorConvertable,
+{
+    type InputType;
+
+    fn get_input(&self) -> Option<Self::InputType>;
+    fn get_registers(&self) -> Registers;
+    fn get_instructions(&self) -> Vec<Box<dyn Operable<Self::InputType>>>;
+    fn dyn_clone(&self) -> Box<dyn Executable<InputType = Self::InputType>>;
+}
+
+trait Runnable
+where
+    Self::InputType: VectorConvertable,
+    Self::ExecutableType: Executable,
+{
+    type InputType;
+    type ExecutableType;
+
+    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
+    fn generate_individual(&self) -> Self::ExecutableType;
+    fn init_population(&self, size: usize) -> Population<Self::ExecutableType>;
+    fn compete(&self, retention_percent: f32) -> Population<Self::ExecutableType>;
+}
+
+#[derive(Debug, Clone)]
+enum Exemplars<'a, InputType>
+where
+    InputType: VectorConvertable,
+{
+    Register(&'a Registers),
+    Input(&'a InputType),
 }
 
 impl<T: VectorConvertable> Clone for Box<dyn Operable<T>> {
@@ -131,16 +157,30 @@ where
     inputs: Rc<Inputs<InputType>>,
 }
 
-trait Executable
-where
-    Self::InputType: VectorConvertable,
-{
-    type InputType;
+impl Auditable for Program<IrisInput> {
+    fn eval_fitness(&self) -> Fitness {
+        todo!()
+    }
+}
 
-    fn get_input(&self) -> Option<Self::InputType>;
-    fn get_registers(&self) -> Registers;
-    fn get_instructions(&self) -> Vec<Box<dyn Operable<Self::InputType>>>;
-    fn dyn_clone(&self) -> Box<dyn Executable<InputType = Self::InputType>>;
+impl Executable for Program<IrisInput> {
+    type InputType = IrisInput;
+
+    fn get_input(&self) -> Option<Self::InputType> {
+        todo!()
+    }
+
+    fn get_registers(&self) -> Registers {
+        todo!()
+    }
+
+    fn get_instructions(&self) -> Vec<Box<dyn Operable<Self::InputType>>> {
+        todo!()
+    }
+
+    fn dyn_clone(&self) -> Box<dyn Executable<InputType = Self::InputType>> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -161,25 +201,28 @@ where
 }
 
 #[derive(Debug, Clone)]
-struct Population<InputType: VectorConvertable>(
-    Collection<Box<dyn Executable<InputType = InputType>>>,
-);
+struct Population<ExecutableType: Executable>(Collection<ExecutableType>);
 
-#[derive(Clone, Debug)]
-struct LinearGeneticProgramming<InputType>
+#[derive(Debug, Clone)]
+struct LinearGeneticProgramming<InputType, ExecutableType>
 where
     InputType: VectorConvertable,
+    ExecutableType: Executable,
 {
     hyper_parameters: HyperParameters,
-    population: Population<InputType>,
+    population: Population<ExecutableType>,
     inputs: Inputs<InputType>,
 }
 
-impl<InputType> LinearGeneticProgramming<InputType>
+impl<InputType, ExecutableType> LinearGeneticProgramming<InputType, ExecutableType>
 where
     InputType: VectorConvertable,
+    ExecutableType: Executable,
 {
-    fn new<T>(lgp: T, hyper_parameters: HyperParameters) -> LinearGeneticProgramming<T::InputType>
+    fn new<T>(
+        lgp: T,
+        hyper_parameters: HyperParameters,
+    ) -> LinearGeneticProgramming<T::InputType, T::ExecutableType>
     where
         T: Runnable,
         T::InputType: VectorConvertable,
@@ -193,10 +236,13 @@ where
             hyper_parameters,
         };
     }
+
+    fn run(&self, lgp: impl Runnable) {}
 }
 
 impl Runnable for TestLGP {
     type InputType = IrisInput;
+    type ExecutableType = Program<Self::InputType>;
 
     fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType> {
         let mut csv_reader = ReaderBuilder::new()
@@ -214,31 +260,17 @@ impl Runnable for TestLGP {
         return Inputs(inputs);
     }
 
-    fn init_population(&self, size: usize) -> Population<Self::InputType> {
+    fn init_population(&self, size: usize) -> Population<Self::ExecutableType> {
         todo!()
     }
 
-    fn compete(&self, retention_percent: f32) -> Population<Self::InputType> {
+    fn compete(&self, retention_percent: f32) -> Population<Self::ExecutableType> {
         todo!()
     }
 
-    fn run(&self, n_generations: usize) -> () {
+    fn generate_individual(&self) -> Self::ExecutableType {
         todo!()
     }
-
-    fn generate_individual(&self) -> Program<Self::InputType> {
-        todo!()
-    }
-}
-
-trait Runnable {
-    type InputType: VectorConvertable;
-
-    fn load_inputs(&self, file_path: &Path) -> Inputs<Self::InputType>;
-    fn generate_individual(&self) -> Program<Self::InputType>;
-    fn init_population(&self, size: usize) -> Population<Self::InputType>;
-    fn compete(&self, retention_percent: f32) -> Population<Self::InputType>;
-    fn run(&self, n_generations: usize) -> ();
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
