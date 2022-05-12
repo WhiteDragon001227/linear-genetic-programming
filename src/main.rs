@@ -1,7 +1,9 @@
 use core::fmt;
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
+use rand::{distributions::Standard, prelude::Distribution};
 use std::{
+    cell::RefCell,
     fmt::Debug,
     path::{Path, PathBuf},
     rc::Rc,
@@ -14,7 +16,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 
-/// Lets describe the steps we're trying to execuet.
+/// Lets describe the steps we're trying to execute.
 ///
 /// First we initialize a population of programs.
 ///
@@ -114,8 +116,11 @@ trait Auditable: fmt::Debug {
     fn eval_fitness(&mut self) -> f32;
 }
 
+// For convenience.
 type AnyExecutable<T> = Box<dyn Executable<InputType = T>>;
 type AnyProgrammable<T> = Box<dyn Programmable<InputType = T>>;
+
+type Index = Option<i8>;
 
 trait Executable: fmt::Debug
 where
@@ -126,12 +131,21 @@ where
     fn exec(
         &self,
         registers: &mut Registers,
-        data: Exemplars<Self::InputType>,
-        source_index: i8,
-        target_index: i8,
+        data: &Data<Self::InputType>,
+        source_index: Index,
+        target_index: Index,
     ) -> ();
 
     fn dyn_clone(&self) -> AnyExecutable<Self::InputType>;
+}
+
+impl<InputType> Clone for AnyExecutable<InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    fn clone(&self) -> Self {
+        self.dyn_clone()
+    }
 }
 
 trait Programmable: fmt::Debug + Auditable
@@ -141,7 +155,8 @@ where
     type InputType;
 
     fn get_inputs(&self) -> Rc<Inputs<Self::InputType>>;
-    fn get_instructions(&self) -> Collection<AnyExecutable<Self::InputType>>;
+    fn get_instructions(&self) -> &Collection<AnyExecutable<Self::InputType>>;
+    fn get_registers(&self) -> RefCell<Registers>;
 
     fn dyn_clone(&self) -> AnyProgrammable<Self::InputType>;
 }
@@ -169,33 +184,11 @@ where
     fn compete(&self, retention_percent: f32) -> Population<Self::ProgramType>;
 }
 
-#[derive(Debug, Clone)]
-enum Exemplars<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    Register(&'a Registers),
-    Input(&'a InputType),
-}
-
-impl<InputType> Clone for AnyExecutable<InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    fn clone(&self) -> Self {
-        self.dyn_clone()
-    }
-}
-
 #[derive(Clone, Debug)]
-struct Instruction<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
+struct Instruction<'a> {
     source: i8,
     target: i8,
-    mode: &'a Exemplars<'a, InputType>,
-    registers: &'a Registers,
+    data: &'a Registers,
 }
 
 #[derive(Debug, Clone)]
@@ -205,15 +198,20 @@ where
 {
     instructions: Collection<AnyExecutable<InputType>>,
     inputs: Rc<Inputs<InputType>>,
+    registers: RefCell<Registers>,
 }
 
 impl Auditable for Program<IrisInput> {
     fn eval_fitness(&mut self) -> f32 {
-        let inputs = &self.inputs.0;
+        let inputs = &self.get_inputs().0;
 
         for input in inputs {
-            let mut registers = Registers::new(0);
-            for instruction in &self.instructions {}
+            let mut registers = Registers::new(100);
+
+            for instruction in self.get_instructions() {
+                //instruction.exec(&mut registers)
+            }
+
             registers.reset();
 
             // reset
@@ -228,15 +226,25 @@ impl Programmable for Program<IrisInput> {
     type InputType = IrisInput;
 
     fn get_inputs(&self) -> Rc<Inputs<Self::InputType>> {
-        todo!()
+        Rc::clone(&self.inputs)
     }
 
-    fn get_instructions(&self) -> Collection<AnyExecutable<Self::InputType>> {
-        todo!()
+    fn get_instructions(&self) -> &Collection<AnyExecutable<Self::InputType>> {
+        return &self.instructions;
     }
 
     fn dyn_clone(&self) -> AnyProgrammable<Self::InputType> {
-        todo!()
+        let clone = Program::<IrisInput> {
+            inputs: Rc::clone(&self.inputs),
+            instructions: self.instructions.clone(),
+            registers: self.registers.clone(),
+        };
+
+        Box::new(clone)
+    }
+
+    fn get_registers(&self) -> RefCell<Registers> {
+        RefCell::new(Registers::new(4))
     }
 }
 
