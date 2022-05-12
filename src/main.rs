@@ -68,7 +68,7 @@ type Collection<ItemType> = Vec<ItemType>;
 struct Registers(Collection<f32>);
 
 impl Registers {
-    fn init(n_registers: usize) -> Registers {
+    fn new(n_registers: usize) -> Registers {
         Registers(vec![0.; n_registers])
     }
 
@@ -79,23 +79,45 @@ impl Registers {
             registers[index - 1] = 0.;
         }
     }
+
+    fn argmax(&self) -> usize {
+        let mut max_index: i32 = -1;
+        let Registers(registers) = &self;
+        let mut current_max = f32::NEG_INFINITY;
+
+        for (index, value) in registers.iter().enumerate() {
+            if value > &current_max {
+                current_max = *value;
+                max_index = index as i32;
+            }
+        }
+
+        max_index.try_into().unwrap()
+    }
+}
+
+trait RegisterRepresentable: fmt::Debug + Into<Registers>
+where
+    Self::InputType: Eq + PartialEq,
+{
+    type InputType;
+
+    fn argmax(registers: Registers) -> Self::InputType;
 }
 
 #[derive(Debug, Clone)]
-struct Inputs<InputType: VectorConvertable>(Collection<InputType>);
+struct Inputs<InputType: RegisterRepresentable>(Collection<InputType>);
 
 trait Auditable: fmt::Debug {
     fn eval_fitness(&mut self) -> f32;
 }
-
-trait VectorConvertable: fmt::Debug + Into<Registers> {}
 
 type AnyExecutable<T> = Box<dyn Executable<InputType = T>>;
 type AnyProgrammable<T> = Box<dyn Programmable<InputType = T>>;
 
 trait Executable: fmt::Debug
 where
-    Self::InputType: VectorConvertable,
+    Self::InputType: RegisterRepresentable,
 {
     type InputType;
 
@@ -112,7 +134,7 @@ where
 
 trait Programmable: fmt::Debug + Auditable
 where
-    Self::InputType: VectorConvertable,
+    Self::InputType: RegisterRepresentable,
 {
     type InputType;
 
@@ -124,7 +146,7 @@ where
 
 impl<InputType> Clone for AnyProgrammable<InputType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
 {
     fn clone(&self) -> Self {
         self.dyn_clone()
@@ -133,7 +155,7 @@ where
 
 trait Runnable
 where
-    Self::InputType: VectorConvertable,
+    Self::InputType: RegisterRepresentable,
     Self::ProgramType: Programmable,
 {
     type InputType;
@@ -148,7 +170,7 @@ where
 #[derive(Debug, Clone)]
 enum Exemplars<'a, InputType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
 {
     Register(&'a Registers),
     Input(&'a InputType),
@@ -156,7 +178,7 @@ where
 
 impl<InputType> Clone for AnyExecutable<InputType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
 {
     fn clone(&self) -> Self {
         self.dyn_clone()
@@ -166,7 +188,7 @@ where
 #[derive(Clone, Debug)]
 struct Instruction<'a, InputType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
 {
     source: i8,
     target: i8,
@@ -177,19 +199,18 @@ where
 #[derive(Debug, Clone)]
 struct Program<InputType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
 {
     instructions: Collection<AnyExecutable<InputType>>,
     inputs: Rc<Inputs<InputType>>,
-    registers: Registers,
 }
 
 impl Auditable for Program<IrisInput> {
     fn eval_fitness(&mut self) -> f32 {
         let inputs = &self.inputs.0;
-        let registers = &mut self.registers;
 
         for input in inputs {
+            let registers = Registers::new(0);
             for instruction in &self.instructions {}
             registers.reset();
 
@@ -231,7 +252,7 @@ struct Population<ProgramType: Programmable>(Collection<ProgramType>);
 #[derive(Debug, Clone)]
 struct LinearGeneticProgramming<InputType, ExecutableType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
     ExecutableType: Programmable,
 {
     hyper_parameters: HyperParameters,
@@ -241,7 +262,7 @@ where
 
 impl<InputType, ProgramType> LinearGeneticProgramming<InputType, ProgramType>
 where
-    InputType: VectorConvertable,
+    InputType: RegisterRepresentable,
     ProgramType: Programmable,
 {
     fn new<T>(
@@ -250,7 +271,7 @@ where
     ) -> LinearGeneticProgramming<T::InputType, T::ProgramType>
     where
         T: Runnable,
-        T::InputType: VectorConvertable,
+        T::InputType: RegisterRepresentable,
     {
         let inputs = lgp.load_inputs(&hyper_parameters.input_file_path);
         let population = lgp.init_population(hyper_parameters.population_size);
@@ -263,7 +284,6 @@ where
     }
 
     fn run(&self, lgp: impl Runnable) {
-        //
         // until generation limit is met:
         //    for every program,
         //      population = lgp.compete
@@ -318,7 +338,11 @@ struct IrisInput {
     class: IrisClass,
 }
 
-impl VectorConvertable for IrisInput {}
+impl RegisterRepresentable for IrisInput {
+    type InputType = IrisClass;
+
+    fn argmax(registers: Registers) -> Self::InputType {}
+}
 
 impl Into<Registers> for IrisInput {
     fn into(self) -> Registers {
