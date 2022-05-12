@@ -1,4 +1,6 @@
 use core::fmt;
+use num::FromPrimitive;
+use num_derive::FromPrimitive;
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
@@ -80,7 +82,7 @@ impl Registers {
         }
     }
 
-    fn argmax(&self) -> usize {
+    fn argmax<T: FromPrimitive>(&self) -> Option<T> {
         let mut max_index: i32 = -1;
         let Registers(registers) = &self;
         let mut current_max = f32::NEG_INFINITY;
@@ -92,17 +94,17 @@ impl Registers {
             }
         }
 
-        max_index.try_into().unwrap()
+        num::FromPrimitive::from_i32(max_index)
     }
 }
 
 trait RegisterRepresentable: fmt::Debug + Into<Registers>
 where
-    Self::InputType: Eq + PartialEq,
+    Self::TrueType: FromPrimitive,
 {
-    type InputType;
+    type TrueType;
 
-    fn argmax(registers: Registers) -> Self::InputType;
+    fn argmax(registers: Registers) -> Option<Self::TrueType>;
 }
 
 #[derive(Debug, Clone)]
@@ -210,7 +212,7 @@ impl Auditable for Program<IrisInput> {
         let inputs = &self.inputs.0;
 
         for input in inputs {
-            let registers = Registers::new(0);
+            let mut registers = Registers::new(0);
             for instruction in &self.instructions {}
             registers.reset();
 
@@ -321,14 +323,14 @@ impl Runnable for TestLGP {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, FromPrimitive)]
 enum IrisClass {
-    Setosa,
-    Versicolour,
-    Virginica,
+    Setosa = 0,
+    Versicolour = 1,
+    Virginica = 2,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 struct IrisInput {
     sepal_length: f32,
     sepal_width: f32,
@@ -339,9 +341,11 @@ struct IrisInput {
 }
 
 impl RegisterRepresentable for IrisInput {
-    type InputType = IrisClass;
+    type TrueType = IrisClass;
 
-    fn argmax(registers: Registers) -> Self::InputType {}
+    fn argmax(registers: Registers) -> Option<Self::TrueType> {
+        registers.argmax::<Self::TrueType>()
+    }
 }
 
 impl Into<Registers> for IrisInput {
