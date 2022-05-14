@@ -1,16 +1,15 @@
 use core::fmt;
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
-use rand::{distributions::Standard, prelude::Distribution};
 use std::{
-    cell::RefCell,
     fmt::Debug,
+    marker::PhantomData,
     path::{Path, PathBuf},
-    rc::Rc,
     u8,
 };
 
 use csv::ReaderBuilder;
+
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer,
@@ -61,7 +60,9 @@ use serde::{
 ///         reset registers
 ///     Fitness Score = # of correct / # of inputs.
 ///
-struct TestLGP;
+///
+/// Linear Genetic Programming -> 1 Runnable -> N Programmable -> Executable  
+struct TestLGP<'a>(PhantomData<&'a ()>);
 
 const IRIS_DATASET_LINK: &'static str =
     "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
@@ -118,9 +119,18 @@ trait Auditable: fmt::Debug {
 
 // For convenience.
 type AnyExecutable<T> = Box<dyn Executable<InputType = T>>;
-type AnyProgrammable<T> = Box<dyn Programmable<InputType = T>>;
+type AnyProgrammable<'a, T> = Box<dyn Programmable<'a, InputType = T> + 'a>;
 
 type Index = Option<i8>;
+
+#[derive(Debug, Clone)]
+enum Data<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    Input(&'a InputType),
+    Registers(&'a Registers),
+}
 
 trait Executable: fmt::Debug
 where
@@ -131,7 +141,7 @@ where
     fn exec(
         &self,
         registers: &mut Registers,
-        data: &Data<Self::InputType>,
+        data: Data<Self::InputType>,
         source_index: Index,
         target_index: Index,
     ) -> ();
@@ -148,20 +158,20 @@ where
     }
 }
 
-trait Programmable: fmt::Debug + Auditable
+trait Programmable<'a>: fmt::Debug + Auditable
 where
     Self::InputType: RegisterRepresentable,
 {
     type InputType;
 
-    fn get_inputs(&self) -> Rc<Inputs<Self::InputType>>;
+    fn get_inputs(&self) -> &'a Inputs<Self::InputType>;
     fn get_instructions(&self) -> &Collection<AnyExecutable<Self::InputType>>;
-    fn get_registers(&self) -> RefCell<Registers>;
+    fn get_registers(&mut self) -> &mut Registers;
 
-    fn dyn_clone(&self) -> AnyProgrammable<Self::InputType>;
+    fn dyn_clone(&self) -> AnyProgrammable<'a, Self::InputType>;
 }
 
-impl<InputType> Clone for AnyProgrammable<InputType>
+impl<'a, InputType> Clone for AnyProgrammable<'a, InputType>
 where
     InputType: RegisterRepresentable,
 {
@@ -170,49 +180,62 @@ where
     }
 }
 
-trait Runnable
+trait Runnable<'a>
 where
-    Self::InputType: RegisterRepresentable,
-    Self::ProgramType: Programmable,
+    Self::ProgramType: Programmable<'a>,
 {
-    type InputType;
     type ProgramType;
 
-    fn load_inputs(&self, file_path: &Path) -> Rc<Inputs<Self::InputType>>;
-    fn generate_individual(&self) -> Self::ProgramType;
-    fn init_population(&self, size: usize) -> Population<Self::ProgramType>;
-    fn compete(&self, retention_percent: f32) -> Population<Self::ProgramType>;
+    fn load_inputs(
+        file_path: &'a Path,
+    ) -> Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType>;
+
+    fn generate_individual() -> Self::ProgramType;
+    fn init_population(size: usize) -> Population<'a, Self::ProgramType>;
+    fn compete(
+        population: Population<'a, Self::ProgramType>,
+        retention_percent: f32,
+    ) -> Population<Self::ProgramType>;
 }
 
 #[derive(Clone, Debug)]
-struct Instruction<'a> {
+struct Instruction<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
     source: i8,
     target: i8,
-    data: &'a Registers,
+    data: Data<'a, InputType>,
 }
 
 #[derive(Debug, Clone)]
-struct Program<InputType>
+struct Program<'a, InputType>
 where
     InputType: RegisterRepresentable,
 {
     instructions: Collection<AnyExecutable<InputType>>,
-    inputs: Rc<Inputs<InputType>>,
-    registers: RefCell<Registers>,
+    inputs: &'a Inputs<InputType>,
+    internals: InternalProgram,
 }
 
-impl Auditable for Program<IrisInput> {
+#[derive(Debug, Clone)]
+struct InternalProgram {
+    registers: Registers,
+}
+
+impl<'a> Auditable for Program<'a, IrisInput> {
     fn eval_fitness(&mut self) -> f32 {
-        let inputs = &self.get_inputs().0;
+        let Inputs(inputs) = self.get_inputs();
 
         for input in inputs {
-            let mut registers = Registers::new(100);
-
+            let mut registers = self.get_registers();
             for instruction in self.get_instructions() {
                 //instruction.exec(&mut registers)
             }
 
-            registers.reset();
+            /*
+             *registers.reset();
+             */
 
             // reset
             // count - metrics
@@ -222,29 +245,28 @@ impl Auditable for Program<IrisInput> {
     }
 }
 
-impl Programmable for Program<IrisInput> {
+impl<'a> Programmable<'a> for Program<'a, IrisInput> {
     type InputType = IrisInput;
 
-    fn get_inputs(&self) -> Rc<Inputs<Self::InputType>> {
-        Rc::clone(&self.inputs)
+    fn get_inputs(&self) -> &'a Inputs<Self::InputType> {
+        &self.inputs
     }
 
     fn get_instructions(&self) -> &Collection<AnyExecutable<Self::InputType>> {
         return &self.instructions;
     }
 
-    fn dyn_clone(&self) -> AnyProgrammable<Self::InputType> {
-        let clone = Program::<IrisInput> {
-            inputs: Rc::clone(&self.inputs),
+    fn dyn_clone(&self) -> AnyProgrammable<'a, Self::InputType> {
+        let clone = Program::<'a, IrisInput> {
+            inputs: &self.inputs,
             instructions: self.instructions.clone(),
-            registers: self.registers.clone(),
+            internals: self.internals.clone(),
         };
-
         Box::new(clone)
     }
 
-    fn get_registers(&self) -> RefCell<Registers> {
-        RefCell::new(Registers::new(4))
+    fn get_registers(&mut self) -> &mut Registers {
+        &mut self.internals.registers
     }
 }
 
@@ -257,54 +279,16 @@ struct HyperParameters {
 }
 
 #[derive(Debug, Clone)]
-struct Population<ProgramType: Programmable>(Collection<ProgramType>);
-
-#[derive(Debug, Clone)]
-struct LinearGeneticProgramming<InputType, ExecutableType>
+struct Population<'a, ProgramType>(Collection<ProgramType>, PhantomData<&'a ()>)
 where
-    InputType: RegisterRepresentable,
-    ExecutableType: Programmable,
-{
-    hyper_parameters: HyperParameters,
-    population: Population<ExecutableType>,
-    inputs: Rc<Inputs<InputType>>,
-}
+    ProgramType: Programmable<'a>;
 
-impl<InputType, ProgramType> LinearGeneticProgramming<InputType, ProgramType>
-where
-    InputType: RegisterRepresentable,
-    ProgramType: Programmable,
-{
-    fn new<T>(
-        lgp: T,
-        hyper_parameters: HyperParameters,
-    ) -> LinearGeneticProgramming<T::InputType, T::ProgramType>
-    where
-        T: Runnable,
-        T::InputType: RegisterRepresentable,
-    {
-        let inputs = lgp.load_inputs(&hyper_parameters.input_file_path);
-        let population = lgp.init_population(hyper_parameters.population_size);
+impl<'a> Runnable<'a> for TestLGP<'a> {
+    type ProgramType = Program<'a, IrisInput>;
 
-        return LinearGeneticProgramming {
-            inputs,
-            population,
-            hyper_parameters,
-        };
-    }
-
-    fn run(&self, lgp: impl Runnable) {
-        // until generation limit is met:
-        //    for every program,
-        //      population = lgp.compete
-    }
-}
-
-impl Runnable for TestLGP {
-    type InputType = IrisInput;
-    type ProgramType = Program<Self::InputType>;
-
-    fn load_inputs(&self, file_path: &Path) -> Rc<Inputs<Self::InputType>> {
+    fn load_inputs(
+        file_path: &'a Path,
+    ) -> Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType> {
         let mut csv_reader = ReaderBuilder::new()
             .has_headers(false)
             .from_path(file_path)
@@ -312,23 +296,29 @@ impl Runnable for TestLGP {
 
         let raw_inputs: Vec<IrisInput> = csv_reader
             .deserialize()
-            .map(|input| -> Self::InputType { input.unwrap() })
+            .map(|input| -> IrisInput { input.unwrap() })
             .collect();
 
-        return Rc::new(Inputs(raw_inputs));
+        return Inputs(raw_inputs);
     }
 
-    fn generate_individual(&self) -> Self::ProgramType {
+    fn generate_individual() -> Self::ProgramType {
         todo!()
     }
 
-    fn init_population(&self, size: usize) -> Population<Self::ProgramType> {
+    fn init_population(size: usize) -> Population<'a, Self::ProgramType> {
         todo!()
     }
 
-    fn compete(&self, retention_percent: f32) -> Population<Self::ProgramType> {
+    fn compete(
+        population: Population<'a, Self::ProgramType>,
+        retention_percent: f32,
+    ) -> Population<Self::ProgramType> {
         todo!()
     }
+
+    /*
+     */
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, FromPrimitive)]
@@ -457,8 +447,7 @@ mod tests {
         let tmpfile = NamedTempFile::new()?;
         let content = get_iris_content().await?;
         writeln!(&tmpfile, "{}", &content)?;
-        let test_lgp = TestLGP;
-        let inputs = &Runnable::load_inputs(&test_lgp, tmpfile.path()).0;
+        let Inputs(inputs) = <TestLGP as Runnable>::load_inputs(tmpfile.path());
         assert_ne!(inputs.len(), 0);
         Ok(())
     }
