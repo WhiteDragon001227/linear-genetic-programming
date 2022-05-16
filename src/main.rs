@@ -121,7 +121,7 @@ struct SourceIndex(i8);
 struct TargetIndex(i8);
 
 // For convenience.
-type AnyExecutable<'a, T> = fn(&Registers, &Data<'a, T>, SourceIndex, TargetIndex) -> Registers;
+type AnyExecutable<T> = for<'a> fn(&Registers, &Data<'a, T>, SourceIndex, TargetIndex) -> Registers;
 type AnyProgrammable<'a, T> = Box<dyn Programmable<'a, InputType = T> + 'a>;
 
 #[derive(Debug, Clone)]
@@ -130,7 +130,7 @@ where
     InputType: RegisterRepresentable,
 {
     Input(&'a InputType),
-    Registers(&'b Registers),
+    Registers(&'a Registers),
 }
 
 trait Programmable<'a>: fmt::Debug + Auditable
@@ -200,11 +200,11 @@ where
     T: RegisterRepresentable,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let instructions = &self.instructions.iter().map(|x| -> &fn(&'a Registers, ) )
+        // TODO: Represent instructions.
         f.debug_struct("Program")
             .field("inputs", &self.inputs)
             .field("internals", &self.internals)
-        .finish();
+            .finish()
     }
 }
 
