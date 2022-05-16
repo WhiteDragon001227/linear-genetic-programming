@@ -45,8 +45,10 @@ use serde::{
 ///     1. Load input data
 ///     2. Generate programs (instructions, registers, etc..) -- Init Population
 ///     3. Eval Fitness
+///     --
 ///     4. Drop x% (tournament selection)
-///     5. Clone 1 - x %
+///     5. Clone 1 - x % (Pick from the population uniformly)
+///     --
 ///     6. Repeat from 3 until best == median == worst
 ///
 ///
@@ -56,12 +58,20 @@ use serde::{
 /// Fitness Algorithm:
 ///     For every input:
 ///         run all instructions
-///         argmax(instructions) == correct_val
+///         -
+///         argmax(registers) == correct_val
 ///         reset registers
-///     Fitness Score = # of correct / # of inputs.
+///     Fitness Score = # of correct outputs / total.
 ///
 ///
 /// Linear Genetic Programming -> 1 Runnable -> N Programmable -> Executable  
+///
+/// Questions Remaining:
+///
+/// - [] How do verify the integerity of our indices?
+/// - [] Uniform Distribution?
+///
+/// Registers = # of Total Classes + 1
 struct TestLGP<'a>(PhantomData<&'a ()>);
 
 const IRIS_DATASET_LINK: &'static str =
@@ -69,8 +79,9 @@ const IRIS_DATASET_LINK: &'static str =
 
 type Collection<ItemType> = Vec<ItemType>;
 
+type RegisterValue = f32;
 #[derive(Debug, Clone)]
-struct Registers(Collection<f32>);
+struct Registers(Collection<RegisterValue>);
 
 impl Registers {
     fn new(n_registers: usize) -> Registers {
@@ -85,12 +96,23 @@ impl Registers {
         }
     }
 
-    fn argmax<T: FromPrimitive>(&self) -> Option<T> {
+    fn update(&mut self, index: usize, value: RegisterValue) -> () {
+        let Registers(internal_values) = self;
+        internal_values[index] = value
+    }
+
+    fn argmax<T: FromPr<'a>imitive>(&self, n_classes: Option<usize>) -> Option<T> {
+        // Argmax is only over the # of classes.
+        // Consider the edge case:
+        // - [ ] Ties (Correct Answer) => None
         let mut max_index: i32 = -1;
         let Registers(registers) = &self;
         let mut current_max = f32::NEG_INFINITY;
 
-        for (index, value) in registers.iter().enumerate() {
+        for index in 0..n_classes.unwrap() {
+            let value = registers.get(index).unwrap();
+
+            // Deal with ties here (n_classes)
             if value > &current_max {
                 current_max = *value;
                 max_index = index as i32;
@@ -101,47 +123,24 @@ impl Registers {
     }
 }
 
-trait RegisterRepresentable: fmt::Debug + Into<Registers>
-where
-    Self::TrueType: FromPrimitive,
-{
-    type TrueType;
+trait RegisterRepresentable: fmt::Debug + Into<Registers> {}
 
-    fn argmax(registers: Registers) -> Option<Self::TrueType>;
-}
-
-#[derive(Debug, Clone)]
-struct Inputs<InputType: RegisterRepresentable>(Collection<InputType>);
+type Inputs<'a, InputType> = Collection<InputType>;
 
 trait Auditable: fmt::Debug {
     fn eval_fitness(&mut self) -> f32;
 }
 
-struct SourceIndex(i8);
-struct TargetIndex(i8);
-
 // For convenience.
-type AnyExecutable<T> = for<'a> fn(&Registers, &Data<'a, T>, SourceIndex, TargetIndex) -> Registers;
+// AnyExecutive => Side Effects...
+type AnyExecutable = fn(&Registers, &Registers, usize, i8) -> RegisterValue;
 type AnyProgrammable<'a, T> = Box<dyn Programmable<'a, InputType = T> + 'a>;
-
-#[derive(Debug, Clone)]
-enum Data<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    Input(&'a InputType),
-    Registers(&'a Registers),
-}
 
 trait Programmable<'a>: fmt::Debug + Auditable
 where
     Self::InputType: RegisterRepresentable,
 {
     type InputType;
-
-    fn get_inputs(&self) -> &'a Inputs<Self::InputType>;
-    fn get_instructions(&self) -> &Collection<AnyExecutable<Self::InputType>>;
-    fn get_registers(&mut self) -> &mut Registers;
 
     fn dyn_clone(&self) -> AnyProgrammable<'a, Self::InputType>;
 }
@@ -176,56 +175,61 @@ where
 }
 
 #[derive(Clone, Debug)]
-struct Instruction<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    source: i8,
-    target: i8,
-    data: Data<'a, InputType>,
-}
-
-#[derive(Clone)]
 struct Program<'a, InputType>
 where
     InputType: RegisterRepresentable,
 {
-    instructions: Collection<AnyExecutable<InputType>>,
-    inputs: &'a Inputs<InputType>,
-    internals: InternalProgram,
-}
-
-impl<'a, T> fmt::Debug for Program<'a, T>
-where
-    T: RegisterRepresentable,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // TODO: Represent instructions.
-        f.debug_struct("Program")
-            .field("inputs", &self.inputs)
-            .field("internals", &self.internals)
-            .finish()
-    }
-}
-
-#[derive(Debug, Clone)]
-struct InternalProgram {
+    instructions: Collection<Instruction>,
+    inputs: &'a Inputs<'a, InputType>,
     registers: Registers,
+}
+
+#[derive(FromPrimitive, Clone, Debug)]
+enum Modes {
+    Input = 0,
+    Registers = 1,
+}
+
+#[derive(Clone)]
+struct Instruction {
+    source_index: usize,
+    target_index: i8,
+    mode: Modes,
+    exec: AnyExecutable,
+}
+
+impl Debug for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
 }
 
 impl<'a> Auditable for Program<'a, IrisInput> {
     fn eval_fitness(&mut self) -> f32 {
-        let Inputs(inputs) = self.get_inputs();
+        let inputs = self.inputs;
+
+        let fitness = Accuracy(0, 0);
 
         for input in inputs {
-            let mut registers = self.get_registers();
-            for instruction in self.get_instructions() {
-                //instruction.exec(&mut registers)
+            let registers = &mut self.registers;
+            // Pick between input and registers.
+            for instruction in &self.instructions {
+                let data = match instruction.mode {
+                    Modes::Input => input.clone().into(),
+                    _ => registers.clone(),
+                };
+                // the result of this should be pushed to registers
+                let value = (instruction.exec)(
+                    registers,
+                    &data,
+                    instruction.source_index,
+                    instruction.target_index,
+                );
+
+                registers.update(instruction.source_index, value);
             }
 
-            /*
-             *registers.reset();
-             */
+            registers.reset();
 
             // reset
             // count - metrics
@@ -238,25 +242,13 @@ impl<'a> Auditable for Program<'a, IrisInput> {
 impl<'a> Programmable<'a> for Program<'a, IrisInput> {
     type InputType = IrisInput;
 
-    fn get_inputs(&self) -> &'a Inputs<Self::InputType> {
-        &self.inputs
-    }
-
-    fn get_instructions(&self) -> &Collection<AnyExecutable<Self::InputType>> {
-        return &self.instructions;
-    }
-
     fn dyn_clone(&self) -> AnyProgrammable<'a, Self::InputType> {
-        let clone = Program::<'a, IrisInput> {
+        let clone = Program::<'a, Self::InputType> {
             inputs: &self.inputs,
             instructions: self.instructions.clone(),
-            internals: self.internals.clone(),
+            registers: self.registers.clone(),
         };
         Box::new(clone)
-    }
-
-    fn get_registers(&mut self) -> &mut Registers {
-        &mut self.internals.registers
     }
 }
 
@@ -272,6 +264,36 @@ struct HyperParameters {
 struct Population<'a, ProgramType>(Collection<ProgramType>, PhantomData<&'a ()>)
 where
     ProgramType: Programmable<'a>;
+
+trait Metric {
+    type ObservableType;
+    type ResultType;
+
+    fn observe(&mut self, value: Self::ObservableType);
+    fn calculate(&self) -> Self::ResultType;
+}
+
+// n_correct, total
+struct Accuracy(i32, i32);
+
+impl Metric for Accuracy {
+    type ObservableType = bool;
+    type ResultType = f32;
+
+    fn observe(&mut self, value: Self::ObservableType) {
+        let count = match value {
+            true => 1,
+            _ => 0,
+        };
+
+        self.0 += count;
+        self.1 += 1
+    }
+
+    fn calculate(&self) -> Self::ResultType {
+        self.0 as f32 / self.1 as f32
+    }
+}
 
 impl<'a> Runnable<'a> for TestLGP<'a> {
     type ProgramType = Program<'a, IrisInput>;
@@ -289,7 +311,7 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
             .map(|input| -> IrisInput { input.unwrap() })
             .collect();
 
-        return Inputs(raw_inputs);
+        return raw_inputs;
     }
 
     fn generate_individual(inputs: &Inputs<IrisInput>) -> Self::ProgramType {
@@ -305,7 +327,7 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
          *
          *        }
          */
-        todo!()
+        todo!("Need to randomly generate individual.")
     }
 
     fn init_population(size: usize) -> Population<'a, Self::ProgramType> {
@@ -340,13 +362,7 @@ struct IrisInput {
     class: IrisClass,
 }
 
-impl RegisterRepresentable for IrisInput {
-    type TrueType = IrisClass;
-
-    fn argmax(registers: Registers) -> Option<Self::TrueType> {
-        registers.argmax::<Self::TrueType>()
-    }
-}
+impl RegisterRepresentable for IrisInput {}
 
 impl Into<Registers> for IrisInput {
     fn into(self) -> Registers {
@@ -449,7 +465,7 @@ mod tests {
         let tmpfile = NamedTempFile::new()?;
         let content = get_iris_content().await?;
         writeln!(&tmpfile, "{}", &content)?;
-        let Inputs(inputs) = <TestLGP as Runnable>::load_inputs(tmpfile.path());
+        let inputs = <TestLGP as Runnable>::load_inputs(tmpfile.path());
         assert_ne!(inputs.len(), 0);
         Ok(())
     }

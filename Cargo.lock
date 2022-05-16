@@ -372,6 +372,7 @@ name = "linear-genetic-programming"
 version = "0.1.0"
 dependencies = [
  "csv",
+ "log",
  "num",
  "num-derive",
  "num-traits",
