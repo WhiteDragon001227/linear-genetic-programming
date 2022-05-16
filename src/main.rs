@@ -2,7 +2,7 @@ use core::fmt;
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Formatter},
     marker::PhantomData,
     path::{Path, PathBuf},
     u8,
@@ -117,11 +117,12 @@ trait Auditable: fmt::Debug {
     fn eval_fitness(&mut self) -> f32;
 }
 
-// For convenience.
-type AnyExecutable<T> = Box<dyn Executable<InputType = T>>;
-type AnyProgrammable<'a, T> = Box<dyn Programmable<'a, InputType = T> + 'a>;
+struct SourceIndex(i8);
+struct TargetIndex(i8);
 
-type Index = Option<i8>;
+// For convenience.
+type AnyExecutable<'a, T> = fn(&Registers, &Data<'a, T>, SourceIndex, TargetIndex) -> Registers;
+type AnyProgrammable<'a, T> = Box<dyn Programmable<'a, InputType = T> + 'a>;
 
 #[derive(Debug, Clone)]
 enum Data<'a, InputType>
@@ -129,33 +130,7 @@ where
     InputType: RegisterRepresentable,
 {
     Input(&'a InputType),
-    Registers(&'a Registers),
-}
-
-trait Executable: fmt::Debug
-where
-    Self::InputType: RegisterRepresentable,
-{
-    type InputType;
-
-    fn exec(
-        &self,
-        registers: &mut Registers,
-        data: Data<Self::InputType>,
-        source_index: Index,
-        target_index: Index,
-    ) -> ();
-
-    fn dyn_clone(&self) -> AnyExecutable<Self::InputType>;
-}
-
-impl<InputType> Clone for AnyExecutable<InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    fn clone(&self) -> Self {
-        self.dyn_clone()
-    }
+    Registers(&'b Registers),
 }
 
 trait Programmable<'a>: fmt::Debug + Auditable
@@ -190,7 +165,9 @@ where
         file_path: &'a Path,
     ) -> Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType>;
 
-    fn generate_individual() -> Self::ProgramType;
+    fn generate_individual(
+        inputs: &Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType>,
+    ) -> Self::ProgramType;
     fn init_population(size: usize) -> Population<'a, Self::ProgramType>;
     fn compete(
         population: Population<'a, Self::ProgramType>,
@@ -208,7 +185,7 @@ where
     data: Data<'a, InputType>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct Program<'a, InputType>
 where
     InputType: RegisterRepresentable,
@@ -216,6 +193,19 @@ where
     instructions: Collection<AnyExecutable<InputType>>,
     inputs: &'a Inputs<InputType>,
     internals: InternalProgram,
+}
+
+impl<'a, T> fmt::Debug for Program<'a, T>
+where
+    T: RegisterRepresentable,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let instructions = &self.instructions.iter().map(|x| -> &fn(&'a Registers, ) )
+        f.debug_struct("Program")
+            .field("inputs", &self.inputs)
+            .field("internals", &self.internals)
+        .finish();
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -302,7 +292,19 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
         return Inputs(raw_inputs);
     }
 
-    fn generate_individual() -> Self::ProgramType {
+    fn generate_individual(inputs: &Inputs<IrisInput>) -> Self::ProgramType {
+        /*
+         *        const N_REGISTERS: usize = 4;
+         *        let internals = InternalProgram {
+         *            registers: Registers::new(N_REGISTERS)
+         *        };
+         *
+         *        return Program {
+         *            inputs,
+         *            internals,
+         *
+         *        }
+         */
         todo!()
     }
 
