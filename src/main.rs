@@ -88,11 +88,11 @@ type RegisterValue = OrderedFloat<f32>;
 pub struct Registers(Collection<RegisterValue>);
 
 impl Registers {
-    fn new(n_registers: usize) -> Registers {
+    pub fn new(n_registers: usize) -> Registers {
         Registers(vec![OrderedFloat(0f32); n_registers])
     }
 
-    fn reset(&mut self) -> () {
+    pub fn reset(&mut self) -> () {
         let Registers(internal_registers) = self;
 
         for index in 0..internal_registers.len() {
@@ -100,19 +100,19 @@ impl Registers {
         }
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         let Registers(internal_registers) = &self;
         internal_registers.len()
     }
 
-    fn update(&mut self, index: usize, value: RegisterValue) -> () {
+    pub fn update(&mut self, index: usize, value: RegisterValue) -> () {
         let Registers(internal_values) = self;
         internal_values[index] = value
     }
 
     /// Returns:
     ///  `desired_index` if argmax is desired_index else None.
-    fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
+    pub fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
         let mut arg_lookup: HashMap<OrderedFloat<f32>, HashSet<usize>> = HashMap::new();
 
         let Registers(registers) = &self;
@@ -150,9 +150,9 @@ trait Auditable: fmt::Debug {
     fn eval_fitness(&mut self) -> FitnessScore;
 }
 
-// For convenience.
-// AnyExecutive => Side Effects...
-type AnyExecutable = fn(&Registers, &Registers, usize, i8) -> RegisterValue;
+pub struct CollectionIndexPair<'a>(&'a Registers, usize);
+
+type AnyExecutable = fn(CollectionIndexPair, CollectionIndexPair) -> RegisterValue;
 
 trait Runnable<'a>
 where
@@ -162,12 +162,11 @@ where
 
     fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType>;
 
-    fn generate_individual(
+    fn init_population(
+        size: usize,
+        max_instructions: usize,
         inputs: &'a Inputs<Self::InputType>,
-        n_individuals: usize,
-    ) -> Program<'a, Self::InputType>;
-
-    fn init_population(size: usize) -> Population<'a, Self::InputType>;
+    ) -> Population<'a, Self::InputType>;
 
     fn compete(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType>;
 }
@@ -186,32 +185,20 @@ where
 mod iris {
     pub mod iris_ops {
 
-        use crate::{AnyExecutable, RegisterValue, Registers};
+        use crate::{AnyExecutable, CollectionIndexPair, RegisterValue};
 
-        pub fn add(
-            registers: &Registers,
-            data: &Registers,
-            src_idx: usize,
-            tgt_idx: i8,
-        ) -> RegisterValue {
+        pub fn add(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
             ordered_float::OrderedFloat(0.)
         }
 
         pub fn subtract(
-            registers: &Registers,
-            data: &Registers,
-            src_idx: usize,
-            tgt_idx: i8,
+            registers: CollectionIndexPair,
+            data: CollectionIndexPair,
         ) -> RegisterValue {
             ordered_float::OrderedFloat(0.)
         }
 
-        pub fn divide(
-            registers: &Registers,
-            data: &Registers,
-            src_idx: usize,
-            tgt_idx: i8,
-        ) -> RegisterValue {
+        pub fn divide(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
             ordered_float::OrderedFloat(0.)
         }
 
@@ -353,7 +340,7 @@ impl Distribution<Modes> for Standard {
 #[derive(Clone)]
 struct Instruction {
     source_index: usize,
-    target_index: i8,
+    target_index: usize,
     mode: Modes,
     exec: AnyExecutable,
 }
@@ -372,7 +359,7 @@ impl Instruction {
 
         Instruction {
             source_index,
-            target_index: target_index as i8,
+            target_index,
             exec: *exec,
             mode,
         }
@@ -403,10 +390,8 @@ impl<'a> Auditable for Program<'a, IrisInput> {
                 };
 
                 let value = (instruction.exec)(
-                    registers,
-                    &data,
-                    instruction.source_index,
-                    instruction.target_index,
+                    CollectionIndexPair(registers, instruction.source_index),
+                    CollectionIndexPair(&data, instruction.target_index),
                 );
 
                 registers.update(instruction.source_index, value);
@@ -481,19 +466,18 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
         return raw_inputs;
     }
 
-    fn generate_individual(
-        inputs: &'a Inputs<Self::InputType>,
-        n_individuals: usize,
-    ) -> Program<'a, Self::InputType> {
-        todo!()
-    }
-
-    fn init_population(size: usize) -> Population<'a, Self::InputType> {
-        todo!()
-    }
-
     fn compete(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType> {
         todo!()
+    }
+
+    fn init_population(
+        size: usize,
+        max_instructions: usize,
+        inputs: &'a Inputs<Self::InputType>,
+    ) -> Population<'a, Self::InputType> {
+        (0..size)
+            .map(|_| Program::generate(inputs, max_instructions))
+            .collect()
     }
 }
 
@@ -511,23 +495,46 @@ fn main() {
 mod tests {
     use std::{error, io::Write};
 
+    use strum::Display;
     use tempfile::NamedTempFile;
 
     use crate::iris::iris_data::IRIS_DATASET_LINK;
 
     use super::*;
 
-    async fn get_iris_content() -> Result<String, Box<dyn error::Error>> {
+    async fn get_iris_content() -> Result<ContentFilePair, Box<dyn error::Error>> {
+        let tmp_file = NamedTempFile::new()?;
         let response = reqwest::get(IRIS_DATASET_LINK).await?;
         let content = response.text().await?;
+        writeln!(&tmp_file, "{}", &content)?;
 
-        Ok(content)
+        Ok(ContentFilePair(content, tmp_file))
+    }
+
+    struct ContentFilePair(String, NamedTempFile);
+
+    #[tokio::test]
+    async fn given_inputs_and_hyperparams_when_population_is_initialized_then_population_generated_with_hyperparams_and_inputs(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = <TestLGP as Runnable>::load_inputs(tmp_file.path());
+        const SIZE: usize = 100;
+        const MAX_INSTRUCTIONS: usize = 100;
+        let population = <TestLGP as Runnable>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
+
+        assert!(population.len() == SIZE);
+
+        for individual in population {
+            assert!(individual.instructions.len() <= SIZE)
+        }
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn given_iris_dataset_when_csv_is_read_then_rows_are_deserialized_as_structs(
     ) -> Result<(), Box<dyn error::Error>> {
-        let content = get_iris_content().await?;
+        let ContentFilePair(content, _) = get_iris_content().await?;
         assert_ne!(content.len(), 0);
 
         let content_bytes = content.as_bytes();
@@ -552,9 +559,7 @@ mod tests {
     #[tokio::test]
     async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
     ) -> Result<(), Box<dyn error::Error>> {
-        let tmpfile = NamedTempFile::new()?;
-        let content = get_iris_content().await?;
-        writeln!(&tmpfile, "{}", &content)?;
+        let ContentFilePair(_, tmpfile) = get_iris_content().await?;
         let inputs = <TestLGP as Runnable>::load_inputs(tmpfile.path());
         assert_ne!(inputs.len(), 0);
         Ok(())
