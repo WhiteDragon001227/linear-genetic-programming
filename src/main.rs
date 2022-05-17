@@ -1,4 +1,5 @@
 use core::fmt;
+use iris::iris_data::{IrisClass, IrisInput};
 use num_derive::FromPrimitive;
 use rand::{
     distributions::{
@@ -16,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use strum::EnumCount;
-use Iris::IrisData::IrisInput;
 
 use csv::ReaderBuilder;
 use ordered_float::OrderedFloat;
@@ -80,15 +80,12 @@ use ordered_float::OrderedFloat;
 /// Registers = # of Total Classes + 1
 struct TestLGP<'a>(PhantomData<&'a ()>);
 
-const IRIS_DATASET_LINK: &'static str =
-    "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
-
 type Collection<ItemType> = Vec<ItemType>;
 
 type RegisterValue = OrderedFloat<f32>;
 
 #[derive(Debug, Clone)]
-struct Registers(Collection<RegisterValue>);
+pub struct Registers(Collection<RegisterValue>);
 
 impl Registers {
     fn new(n_registers: usize) -> Registers {
@@ -96,10 +93,10 @@ impl Registers {
     }
 
     fn reset(&mut self) -> () {
-        let registers = &mut self.0;
+        let Registers(internal_registers) = self;
 
-        for index in 1..registers.len() {
-            registers[index - 1] = OrderedFloat(0f32);
+        for index in 0..internal_registers.len() {
+            internal_registers[index] = OrderedFloat(0f32);
         }
     }
 
@@ -156,25 +153,6 @@ trait Auditable: fmt::Debug {
 // For convenience.
 // AnyExecutive => Side Effects...
 type AnyExecutable = fn(&Registers, &Registers, usize, i8) -> RegisterValue;
-type AnyProgrammable<'a, T> = Box<dyn Programmable<'a, InputType = T> + 'a>;
-
-trait Programmable<'a>: fmt::Debug + Auditable
-where
-    Self::InputType: RegisterRepresentable,
-{
-    type InputType;
-
-    fn dyn_clone(&self) -> AnyProgrammable<'a, Self::InputType>;
-}
-
-impl<'a, InputType> Clone for AnyProgrammable<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    fn clone(&self) -> Self {
-        self.dyn_clone()
-    }
-}
 
 trait Runnable<'a>
 where
@@ -184,7 +162,10 @@ where
 
     fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType>;
 
-    fn generate_individual(inputs: &'a Inputs<Self::InputType>) -> Program<'a, Self::InputType>;
+    fn generate_individual(
+        inputs: &'a Inputs<Self::InputType>,
+        n_individuals: usize,
+    ) -> Program<'a, Self::InputType>;
 
     fn init_population(size: usize) -> Population<'a, Self::InputType>;
 
@@ -202,8 +183,8 @@ where
     registers: Registers,
 }
 
-mod Iris {
-    pub mod IrisOps {
+mod iris {
+    pub mod iris_ops {
 
         use crate::{AnyExecutable, RegisterValue, Registers};
 
@@ -238,7 +219,7 @@ mod Iris {
             &[self::add, self::subtract, self::divide];
     }
 
-    pub mod IrisData {
+    pub mod iris_data {
         use core::fmt;
 
         use ordered_float::OrderedFloat;
@@ -249,6 +230,9 @@ mod Iris {
         use strum::EnumCount;
 
         use crate::{RegisterRepresentable, Registers};
+
+        pub const IRIS_DATASET_LINK: &'static str =
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
 
         #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount)]
         pub enum IrisClass {
@@ -264,7 +248,7 @@ mod Iris {
             petal_length: f32,
             petal_width: f32,
             #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
-            class: IrisClass,
+            pub class: IrisClass,
         }
 
         impl RegisterRepresentable for IrisInput {
@@ -330,7 +314,7 @@ impl<'a> Program<'a, IrisInput> {
         let registers = Registers::new(register_len);
         let input_len = <IrisInput as RegisterRepresentable>::get_number_features();
 
-        let executables = Iris::IrisOps::EXECUTABLES;
+        let executables = iris::iris_ops::EXECUTABLES;
 
         let n_instructions =
             UniformInt::<usize>::new(0, max_instructions).sample(&mut thread_rng());
@@ -439,19 +423,6 @@ impl<'a> Auditable for Program<'a, IrisInput> {
     }
 }
 
-impl<'a> Programmable<'a> for Program<'a, IrisInput> {
-    type InputType = IrisInput;
-
-    fn dyn_clone(&self) -> AnyProgrammable<'a, Self::InputType> {
-        let clone = Program::<'a, Self::InputType> {
-            inputs: &self.inputs,
-            instructions: self.instructions.clone(),
-            registers: self.registers.clone(),
-        };
-        Box::new(clone)
-    }
-}
-
 #[derive(Debug, Clone)]
 struct HyperParameters {
     population_size: usize,
@@ -488,7 +459,8 @@ impl Metric for Accuracy {
     }
 
     fn calculate(&self) -> Self::ResultType {
-        OrderedFloat(self.0 as f32) / OrderedFloat(self.1 as f32)
+        let Accuracy(n_correct, total) = self;
+        OrderedFloat(*n_correct as f32) / OrderedFloat(*total as f32)
     }
 }
 
@@ -509,7 +481,10 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
         return raw_inputs;
     }
 
-    fn generate_individual(inputs: &'a Inputs<Self::InputType>) -> Program<'a, Self::InputType> {
+    fn generate_individual(
+        inputs: &'a Inputs<Self::InputType>,
+        n_individuals: usize,
+    ) -> Program<'a, Self::InputType> {
         todo!()
     }
 
@@ -537,6 +512,8 @@ mod tests {
     use std::{error, io::Write};
 
     use tempfile::NamedTempFile;
+
+    use crate::iris::iris_data::IRIS_DATASET_LINK;
 
     use super::*;
 
