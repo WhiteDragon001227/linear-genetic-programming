@@ -1,21 +1,24 @@
 use core::fmt;
-use num::FromPrimitive;
 use num_derive::FromPrimitive;
 use rand::{
-    distributions::{uniform::UniformSampler, Standard, Uniform},
-    prelude::Distribution,
+    distributions::{
+        uniform::{UniformInt, UniformSampler},
+        Standard,
+    },
+    prelude::{Distribution, StdRng},
+    seq::SliceRandom,
+    thread_rng, Rng, SeedableRng,
 };
 use std::{
-    collections::{hash_map, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
     marker::PhantomData,
     path::{Path, PathBuf},
-    thread::current,
     u8,
 };
 
 use csv::ReaderBuilder;
-use ordered_float::{NotNan, OrderedFloat};
+use ordered_float::OrderedFloat;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer,
@@ -101,6 +104,10 @@ impl Registers {
         for index in 1..registers.len() {
             registers[index - 1] = OrderedFloat(0f32);
         }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
     }
 
     fn update(&mut self, index: usize, value: RegisterValue) -> () {
@@ -190,6 +197,7 @@ where
     ) -> Population<Self::ProgramType>;
 }
 
+/// TODO: Program Generation
 #[derive(Clone, Debug)]
 struct Program<'a, InputType>
 where
@@ -211,19 +219,45 @@ impl Distribution<Modes> for Standard {
         let should_read_from_input: bool = rng.gen();
 
         if should_read_from_input {
-            return Modes::Input
+            return Modes::Input;
         } else {
-            return Modes::Registers
+            return Modes::Registers;
         }
     }
 }
 
+/// TODO: Instruction Generation
 #[derive(Clone)]
 struct Instruction {
     source_index: usize,
     target_index: i8,
     mode: Modes,
     exec: AnyExecutable,
+}
+
+impl Instruction {
+    fn generate(
+        registers_len: usize,
+        data_len: usize,
+        executables: Vec<AnyExecutable>,
+    ) -> Instruction {
+        // Sanity check
+        assert!(executables.len() != 0);
+        assert!(registers_len != 0);
+        assert!(data_len != 0);
+
+        let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut thread_rng());
+        let target_index = UniformInt::<usize>::new(0, data_len).sample(&mut thread_rng());
+        let exec = executables.choose(&mut thread_rng()).unwrap();
+        let mode = StdRng::from_entropy().sample(Standard);
+
+        Instruction {
+            source_index,
+            target_index: target_index as i8,
+            exec: *exec,
+            mode,
+        }
+    }
 }
 
 impl Debug for Instruction {
