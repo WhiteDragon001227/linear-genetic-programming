@@ -14,15 +14,12 @@ use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     path::{Path, PathBuf},
-    u8,
 };
+use strum::EnumCount;
+use Iris::IrisData::IrisInput;
 
 use csv::ReaderBuilder;
 use ordered_float::OrderedFloat;
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer,
-};
 
 /// Lets describe the steps we're trying to execute.
 ///
@@ -107,7 +104,8 @@ impl Registers {
     }
 
     fn len(&self) -> usize {
-        self.0.len()
+        let Registers(internal_registers) = &self;
+        internal_registers.len()
     }
 
     fn update(&mut self, index: usize, value: RegisterValue) -> () {
@@ -144,7 +142,10 @@ impl Registers {
     }
 }
 
-trait RegisterRepresentable: fmt::Debug + Into<Registers> {}
+trait RegisterRepresentable: fmt::Debug + Into<Registers> + Clone {
+    fn get_number_classes() -> usize;
+    fn get_number_features() -> usize;
+}
 
 type Inputs<'a, InputType> = Collection<InputType>;
 
@@ -177,24 +178,17 @@ where
 
 trait Runnable<'a>
 where
-    Self::ProgramType: Programmable<'a>,
+    Self::InputType: RegisterRepresentable,
 {
-    type ProgramType;
+    type InputType;
 
-    fn load_inputs(
-        file_path: &'a Path,
-    ) -> Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType>;
+    fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType>;
 
-    fn generate_individual(
-        inputs: &Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType>,
-    ) -> Self::ProgramType;
+    fn generate_individual(inputs: &'a Inputs<Self::InputType>) -> Program<'a, Self::InputType>;
 
-    fn init_population(size: usize) -> Population<'a, Self::ProgramType>;
+    fn init_population(size: usize) -> Population<'a, Self::InputType>;
 
-    fn compete(
-        population: Population<'a, Self::ProgramType>,
-        retention_percent: f32,
-    ) -> Population<Self::ProgramType>;
+    fn compete(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType>;
 }
 
 /// TODO: Program Generation
@@ -208,7 +202,152 @@ where
     registers: Registers,
 }
 
-#[derive(FromPrimitive, Clone, Debug)]
+mod Iris {
+    pub mod IrisOps {
+
+        use crate::{AnyExecutable, RegisterValue, Registers};
+
+        pub fn add(
+            registers: &Registers,
+            data: &Registers,
+            src_idx: usize,
+            tgt_idx: i8,
+        ) -> RegisterValue {
+            ordered_float::OrderedFloat(0.)
+        }
+
+        pub fn subtract(
+            registers: &Registers,
+            data: &Registers,
+            src_idx: usize,
+            tgt_idx: i8,
+        ) -> RegisterValue {
+            ordered_float::OrderedFloat(0.)
+        }
+
+        pub fn divide(
+            registers: &Registers,
+            data: &Registers,
+            src_idx: usize,
+            tgt_idx: i8,
+        ) -> RegisterValue {
+            ordered_float::OrderedFloat(0.)
+        }
+
+        pub const EXECUTABLES: &'static [AnyExecutable; 3] =
+            &[self::add, self::subtract, self::divide];
+    }
+
+    pub mod IrisData {
+        use core::fmt;
+
+        use ordered_float::OrderedFloat;
+        use serde::{
+            de::{self, Visitor},
+            Deserialize, Deserializer,
+        };
+        use strum::EnumCount;
+
+        use crate::{RegisterRepresentable, Registers};
+
+        #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount)]
+        pub enum IrisClass {
+            Setosa = 0,
+            Versicolour = 1,
+            Virginica = 2,
+        }
+
+        #[derive(Deserialize, Debug, Clone, PartialEq)]
+        pub struct IrisInput {
+            sepal_length: f32,
+            sepal_width: f32,
+            petal_length: f32,
+            petal_width: f32,
+            #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
+            class: IrisClass,
+        }
+
+        impl RegisterRepresentable for IrisInput {
+            fn get_number_classes() -> usize {
+                IrisClass::COUNT
+            }
+
+            fn get_number_features() -> usize {
+                4
+            }
+        }
+
+        impl Into<Registers> for IrisInput {
+            fn into(self) -> Registers {
+                return Registers(vec![
+                    OrderedFloat(self.sepal_length),
+                    OrderedFloat(self.sepal_width),
+                    OrderedFloat(self.petal_length),
+                    OrderedFloat(self.petal_width),
+                ]);
+            }
+        }
+
+        impl IrisInput {
+            fn deserialize_iris_class<'de, D>(deserializer: D) -> Result<IrisClass, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                const FIELDS: &'static [&'static str] =
+                    &["Iris-setosa", "Iris-versicolor", "Iris-virginica"];
+
+                struct IrisClassVisitor;
+
+                impl<'de> Visitor<'de> for IrisClassVisitor {
+                    type Value = IrisClass;
+
+                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                        formatter.write_str(&FIELDS.join(" or "))
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<IrisClass, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "Iris-setosa" => Ok(IrisClass::Setosa),
+                            "Iris-versicolor" => Ok(IrisClass::Versicolour),
+                            "Iris-virginica" => Ok(IrisClass::Virginica),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_str(IrisClassVisitor)
+            }
+        }
+    }
+}
+
+impl<'a> Program<'a, IrisInput> {
+    fn generate(inputs: &'a Inputs<IrisInput>, max_instructions: usize) -> Self {
+        let register_len = <IrisInput as RegisterRepresentable>::get_number_classes();
+        let registers = Registers::new(register_len);
+        let input_len = <IrisInput as RegisterRepresentable>::get_number_features();
+
+        let executables = Iris::IrisOps::EXECUTABLES;
+
+        let n_instructions =
+            UniformInt::<usize>::new(0, max_instructions).sample(&mut thread_rng());
+
+        let instructions: Vec<Instruction> = (0..n_instructions)
+            .map(|_| Instruction::generate(register_len, input_len, executables))
+            .collect();
+
+        Program {
+            instructions,
+            registers,
+            inputs,
+        }
+    }
+}
+
+#[derive(FromPrimitive, Clone, Debug, EnumCount)]
 enum Modes {
     Input = 0,
     Registers = 1,
@@ -236,11 +375,7 @@ struct Instruction {
 }
 
 impl Instruction {
-    fn generate(
-        registers_len: usize,
-        data_len: usize,
-        executables: Vec<AnyExecutable>,
-    ) -> Instruction {
+    fn generate(registers_len: usize, data_len: usize, executables: &[AnyExecutable]) -> Self {
         // Sanity check
         assert!(executables.len() != 0);
         assert!(registers_len != 0);
@@ -294,7 +429,7 @@ impl<'a> Auditable for Program<'a, IrisInput> {
             }
 
             let correct_index = input.class as usize;
-            let registers_argmax = registers.argmax(N_CLASSES_IRIS, correct_index);
+            let registers_argmax = registers.argmax(IrisClass::COUNT, correct_index);
 
             fitness.observe(Some(correct_index) == registers_argmax);
             registers.reset();
@@ -325,10 +460,7 @@ struct HyperParameters {
     input_file_path: PathBuf,
 }
 
-#[derive(Debug, Clone)]
-struct Population<'a, ProgramType>(Collection<ProgramType>, PhantomData<&'a ()>)
-where
-    ProgramType: Programmable<'a>;
+type Population<'a, InputType> = Collection<Program<'a, InputType>>;
 
 trait Metric {
     type ObservableType;
@@ -361,11 +493,9 @@ impl Metric for Accuracy {
 }
 
 impl<'a> Runnable<'a> for TestLGP<'a> {
-    type ProgramType = Program<'a, IrisInput>;
+    type InputType = IrisInput;
 
-    fn load_inputs(
-        file_path: &'a Path,
-    ) -> Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType> {
+    fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType> {
         let mut csv_reader = ReaderBuilder::new()
             .has_headers(false)
             .from_path(file_path)
@@ -379,96 +509,16 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
         return raw_inputs;
     }
 
-    fn generate_individual(inputs: &Inputs<IrisInput>) -> Self::ProgramType {
-        /*
-         *        let internals = InternalProgram {
-         *            registers: Registers::new(N_REGISTERS)
-         *        };
-         *
-         *        return Program {
-         *            inputs,
-         *            internals,
-         *
-         *        }
-         */
-        todo!("Need to randomly generate individual.")
-    }
-
-    fn init_population(size: usize) -> Population<'a, Self::ProgramType> {
+    fn generate_individual(inputs: &'a Inputs<Self::InputType>) -> Program<'a, Self::InputType> {
         todo!()
     }
 
-    fn compete(
-        population: Population<'a, Self::ProgramType>,
-        retention_percent: f32,
-    ) -> Population<Self::ProgramType> {
+    fn init_population(size: usize) -> Population<'a, Self::InputType> {
         todo!()
     }
-}
 
-const N_CLASSES_IRIS: usize = 3;
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum IrisClass {
-    Setosa = 0,
-    Versicolour = 1,
-    Virginica = 2,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-struct IrisInput {
-    sepal_length: f32,
-    sepal_width: f32,
-    petal_length: f32,
-    petal_width: f32,
-    #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
-    class: IrisClass,
-}
-
-impl RegisterRepresentable for IrisInput {}
-
-impl Into<Registers> for IrisInput {
-    fn into(self) -> Registers {
-        return Registers(vec![
-            OrderedFloat(self.sepal_length),
-            OrderedFloat(self.sepal_width),
-            OrderedFloat(self.petal_length),
-            OrderedFloat(self.petal_width),
-        ]);
-    }
-}
-
-impl IrisInput {
-    fn deserialize_iris_class<'de, D>(deserializer: D) -> Result<IrisClass, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        const FIELDS: &'static [&'static str] =
-            &["Iris-setosa", "Iris-versicolor", "Iris-virginica"];
-
-        struct IrisClassVisitor;
-
-        impl<'de> Visitor<'de> for IrisClassVisitor {
-            type Value = IrisClass;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(&FIELDS.join(" or "))
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<IrisClass, E>
-            where
-                E: de::Error,
-            {
-                match value {
-                    "Iris-setosa" => Ok(IrisClass::Setosa),
-                    "Iris-versicolor" => Ok(IrisClass::Versicolour),
-                    "Iris-virginica" => Ok(IrisClass::Virginica),
-                    _ => Err(de::Error::unknown_field(value, FIELDS)),
-                }
-            }
-        }
-
-        deserializer.deserialize_str(IrisClassVisitor)
+    fn compete(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType> {
+        todo!()
     }
 }
 
