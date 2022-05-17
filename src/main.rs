@@ -1,15 +1,21 @@
 use core::fmt;
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
+use rand::{
+    distributions::{uniform::UniformSampler, Standard, Uniform},
+    prelude::Distribution,
+};
 use std::{
+    collections::{hash_map, HashMap, HashSet},
     fmt::{Debug, Formatter},
     marker::PhantomData,
     path::{Path, PathBuf},
+    thread::current,
     u8,
 };
 
 use csv::ReaderBuilder;
-
+use ordered_float::{NotNan, OrderedFloat};
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer,
@@ -79,20 +85,21 @@ const IRIS_DATASET_LINK: &'static str =
 
 type Collection<ItemType> = Vec<ItemType>;
 
-type RegisterValue = f32;
+type RegisterValue = OrderedFloat<f32>;
+
 #[derive(Debug, Clone)]
 struct Registers(Collection<RegisterValue>);
 
 impl Registers {
     fn new(n_registers: usize) -> Registers {
-        Registers(vec![0.; n_registers])
+        Registers(vec![OrderedFloat(0f32); n_registers])
     }
 
     fn reset(&mut self) -> () {
         let registers = &mut self.0;
 
         for index in 1..registers.len() {
-            registers[index - 1] = 0.;
+            registers[index - 1] = OrderedFloat(0f32);
         }
     }
 
@@ -101,25 +108,32 @@ impl Registers {
         internal_values[index] = value
     }
 
-    fn argmax<T: FromPr<'a>imitive>(&self, n_classes: Option<usize>) -> Option<T> {
-        // Argmax is only over the # of classes.
-        // Consider the edge case:
-        // - [ ] Ties (Correct Answer) => None
-        let mut max_index: i32 = -1;
+    /// Returns:
+    ///  `desired_index` if argmax is desired_index else None.
+    fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
+        let mut arg_lookup: HashMap<OrderedFloat<f32>, HashSet<usize>> = HashMap::new();
+
         let Registers(registers) = &self;
-        let mut current_max = f32::NEG_INFINITY;
 
-        for index in 0..n_classes.unwrap() {
+        for index in 0..n_classes {
             let value = registers.get(index).unwrap();
-
-            // Deal with ties here (n_classes)
-            if value > &current_max {
-                current_max = *value;
-                max_index = index as i32;
+            if arg_lookup.contains_key(value) {
+                arg_lookup.get_mut(value).unwrap().insert(index);
+            } else {
+                arg_lookup.insert(*registers.get(index).unwrap(), HashSet::from([index]));
             }
         }
 
-        num::FromPrimitive::from_i32(max_index)
+        let max_value = arg_lookup.keys().max().unwrap();
+        let indices = arg_lookup.get(max_value).unwrap();
+
+        if indices.contains(&desired_index) {
+            if indices.len() == 1 {
+                return Some(desired_index);
+            }
+        }
+
+        None
     }
 }
 
@@ -128,7 +142,7 @@ trait RegisterRepresentable: fmt::Debug + Into<Registers> {}
 type Inputs<'a, InputType> = Collection<InputType>;
 
 trait Auditable: fmt::Debug {
-    fn eval_fitness(&mut self) -> f32;
+    fn eval_fitness(&mut self) -> FitnessScore;
 }
 
 // For convenience.
@@ -167,7 +181,9 @@ where
     fn generate_individual(
         inputs: &Inputs<<<Self as Runnable<'a>>::ProgramType as Programmable<'a>>::InputType>,
     ) -> Self::ProgramType;
+
     fn init_population(size: usize) -> Population<'a, Self::ProgramType>;
+
     fn compete(
         population: Population<'a, Self::ProgramType>,
         retention_percent: f32,
@@ -190,6 +206,18 @@ enum Modes {
     Registers = 1,
 }
 
+impl Distribution<Modes> for Standard {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Modes {
+        let should_read_from_input: bool = rng.gen();
+
+        if should_read_from_input {
+            return Modes::Input
+        } else {
+            return Modes::Registers
+        }
+    }
+}
+
 #[derive(Clone)]
 struct Instruction {
     source_index: usize,
@@ -204,21 +232,23 @@ impl Debug for Instruction {
     }
 }
 
+type FitnessScore = RegisterValue;
+
 impl<'a> Auditable for Program<'a, IrisInput> {
-    fn eval_fitness(&mut self) -> f32 {
+    fn eval_fitness(&mut self) -> FitnessScore {
         let inputs = self.inputs;
 
-        let fitness = Accuracy(0, 0);
+        let mut fitness = Accuracy(0, 0);
 
         for input in inputs {
             let registers = &mut self.registers;
-            // Pick between input and registers.
+
             for instruction in &self.instructions {
                 let data = match instruction.mode {
                     Modes::Input => input.clone().into(),
                     _ => registers.clone(),
                 };
-                // the result of this should be pushed to registers
+
                 let value = (instruction.exec)(
                     registers,
                     &data,
@@ -229,13 +259,14 @@ impl<'a> Auditable for Program<'a, IrisInput> {
                 registers.update(instruction.source_index, value);
             }
 
-            registers.reset();
+            let correct_index = input.class as usize;
+            let registers_argmax = registers.argmax(N_CLASSES_IRIS, correct_index);
 
-            // reset
-            // count - metrics
+            fitness.observe(Some(correct_index) == registers_argmax);
+            registers.reset();
         }
 
-        0.
+        fitness.calculate()
     }
 }
 
@@ -278,7 +309,7 @@ struct Accuracy(i32, i32);
 
 impl Metric for Accuracy {
     type ObservableType = bool;
-    type ResultType = f32;
+    type ResultType = FitnessScore;
 
     fn observe(&mut self, value: Self::ObservableType) {
         let count = match value {
@@ -291,7 +322,7 @@ impl Metric for Accuracy {
     }
 
     fn calculate(&self) -> Self::ResultType {
-        self.0 as f32 / self.1 as f32
+        OrderedFloat(self.0 as f32) / OrderedFloat(self.1 as f32)
     }
 }
 
@@ -316,7 +347,6 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
 
     fn generate_individual(inputs: &Inputs<IrisInput>) -> Self::ProgramType {
         /*
-         *        const N_REGISTERS: usize = 4;
          *        let internals = InternalProgram {
          *            registers: Registers::new(N_REGISTERS)
          *        };
@@ -340,12 +370,11 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
     ) -> Population<Self::ProgramType> {
         todo!()
     }
-
-    /*
-     */
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, FromPrimitive)]
+const N_CLASSES_IRIS: usize = 3;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum IrisClass {
     Setosa = 0,
     Versicolour = 1,
@@ -367,10 +396,10 @@ impl RegisterRepresentable for IrisInput {}
 impl Into<Registers> for IrisInput {
     fn into(self) -> Registers {
         return Registers(vec![
-            self.sepal_length,
-            self.sepal_width,
-            self.petal_length,
-            self.petal_width,
+            OrderedFloat(self.sepal_length),
+            OrderedFloat(self.sepal_width),
+            OrderedFloat(self.petal_length),
+            OrderedFloat(self.petal_width),
         ]);
     }
 }
