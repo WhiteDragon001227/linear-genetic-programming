@@ -1,5 +1,8 @@
+mod iris;
+mod registers;
+mod utils;
+
 use core::fmt;
-use iris::iris_data::{IrisClass, IrisInput};
 use num_derive::FromPrimitive;
 use rand::{
     distributions::{
@@ -11,7 +14,6 @@ use rand::{
     thread_rng, Rng, SeedableRng,
 };
 use std::{
-    collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -80,83 +82,13 @@ use ordered_float::OrderedFloat;
 /// Registers = # of Total Classes + 1
 struct TestLGP<'a>(PhantomData<&'a ()>);
 
-type Collection<ItemType> = Vec<ItemType>;
-
-type RegisterValue = OrderedFloat<f32>;
-
-#[derive(Debug, Clone)]
-pub struct Registers(Collection<RegisterValue>);
-
-impl Registers {
-    pub fn new(n_registers: usize) -> Registers {
-        Registers(vec![OrderedFloat(0f32); n_registers])
-    }
-
-    pub fn reset(&mut self) -> () {
-        let Registers(internal_registers) = self;
-
-        for index in 0..internal_registers.len() {
-            internal_registers[index] = OrderedFloat(0f32);
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        let Registers(internal_registers) = &self;
-        internal_registers.len()
-    }
-
-    pub fn update(&mut self, index: usize, value: RegisterValue) -> () {
-        let Registers(internal_values) = self;
-        internal_values[index] = value
-    }
-
-    /// Returns:
-    ///  `desired_index` if argmax is desired_index else None.
-    pub fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
-        let mut arg_lookup: HashMap<OrderedFloat<f32>, HashSet<usize>> = HashMap::new();
-
-        let Registers(registers) = &self;
-
-        for index in 0..n_classes {
-            let value = registers.get(index).unwrap();
-            if arg_lookup.contains_key(value) {
-                arg_lookup.get_mut(value).unwrap().insert(index);
-            } else {
-                arg_lookup.insert(*registers.get(index).unwrap(), HashSet::from([index]));
-            }
-        }
-
-        let max_value = arg_lookup.keys().max().unwrap();
-        let indices = arg_lookup.get(max_value).unwrap();
-
-        if indices.contains(&desired_index) {
-            if indices.len() == 1 {
-                return Some(desired_index);
-            }
-        }
-
-        None
-    }
-}
-
-trait RegisterRepresentable: fmt::Debug + Into<Registers> + Clone {
-    fn get_number_classes() -> usize;
-    fn get_number_features() -> usize;
-}
-
-type Inputs<'a, InputType> = Collection<InputType>;
-
 trait Auditable: fmt::Debug {
-    fn eval_fitness(&mut self) -> FitnessScore;
+    fn eval_fitness(&self) -> FitnessScore;
 }
 
-pub struct CollectionIndexPair<'a>(&'a Registers, usize);
-
-type AnyExecutable = fn(CollectionIndexPair, CollectionIndexPair) -> RegisterValue;
-
-trait Runnable<'a>
+trait GeneticAlgorithm<'a>
 where
-    Self::InputType: RegisterRepresentable,
+    Self::InputType: registers::RegisterRepresentable,
 {
     type InputType;
 
@@ -168,10 +100,14 @@ where
         inputs: &'a Inputs<Self::InputType>,
     ) -> Population<'a, Self::InputType>;
 
-    fn compete(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType>;
+    fn retrieve_selection(
+        population: Population<'a, Self::InputType>,
+        retention_rate: f32,
+    ) -> Population<'a, Self::InputType>;
+
+    fn breed(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType>;
 }
 
-/// TODO: Program Generation
 #[derive(Clone, Debug)]
 struct Program<'a, InputType>
 where
@@ -180,119 +116,6 @@ where
     instructions: Collection<Instruction>,
     inputs: &'a Inputs<'a, InputType>,
     registers: Registers,
-}
-
-mod iris {
-    pub mod iris_ops {
-
-        use crate::{AnyExecutable, CollectionIndexPair, RegisterValue};
-
-        pub fn add(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
-            ordered_float::OrderedFloat(0.)
-        }
-
-        pub fn subtract(
-            registers: CollectionIndexPair,
-            data: CollectionIndexPair,
-        ) -> RegisterValue {
-            ordered_float::OrderedFloat(0.)
-        }
-
-        pub fn divide(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
-            ordered_float::OrderedFloat(0.)
-        }
-
-        pub const EXECUTABLES: &'static [AnyExecutable; 3] =
-            &[self::add, self::subtract, self::divide];
-    }
-
-    pub mod iris_data {
-        use core::fmt;
-
-        use ordered_float::OrderedFloat;
-        use serde::{
-            de::{self, Visitor},
-            Deserialize, Deserializer,
-        };
-        use strum::EnumCount;
-
-        use crate::{RegisterRepresentable, Registers};
-
-        pub const IRIS_DATASET_LINK: &'static str =
-            "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
-
-        #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount)]
-        pub enum IrisClass {
-            Setosa = 0,
-            Versicolour = 1,
-            Virginica = 2,
-        }
-
-        #[derive(Deserialize, Debug, Clone, PartialEq)]
-        pub struct IrisInput {
-            sepal_length: f32,
-            sepal_width: f32,
-            petal_length: f32,
-            petal_width: f32,
-            #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
-            pub class: IrisClass,
-        }
-
-        impl RegisterRepresentable for IrisInput {
-            fn get_number_classes() -> usize {
-                IrisClass::COUNT
-            }
-
-            fn get_number_features() -> usize {
-                4
-            }
-        }
-
-        impl Into<Registers> for IrisInput {
-            fn into(self) -> Registers {
-                return Registers(vec![
-                    OrderedFloat(self.sepal_length),
-                    OrderedFloat(self.sepal_width),
-                    OrderedFloat(self.petal_length),
-                    OrderedFloat(self.petal_width),
-                ]);
-            }
-        }
-
-        impl IrisInput {
-            fn deserialize_iris_class<'de, D>(deserializer: D) -> Result<IrisClass, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                const FIELDS: &'static [&'static str] =
-                    &["Iris-setosa", "Iris-versicolor", "Iris-virginica"];
-
-                struct IrisClassVisitor;
-
-                impl<'de> Visitor<'de> for IrisClassVisitor {
-                    type Value = IrisClass;
-
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                        formatter.write_str(&FIELDS.join(" or "))
-                    }
-
-                    fn visit_str<E>(self, value: &str) -> Result<IrisClass, E>
-                    where
-                        E: de::Error,
-                    {
-                        match value {
-                            "Iris-setosa" => Ok(IrisClass::Setosa),
-                            "Iris-versicolor" => Ok(IrisClass::Versicolour),
-                            "Iris-virginica" => Ok(IrisClass::Virginica),
-                            _ => Err(de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_str(IrisClassVisitor)
-            }
-        }
-    }
 }
 
 impl<'a> Program<'a, IrisInput> {
@@ -336,7 +159,6 @@ impl Distribution<Modes> for Standard {
     }
 }
 
-/// TODO: Instruction Generation
 #[derive(Clone)]
 struct Instruction {
     source_index: usize,
@@ -375,13 +197,13 @@ impl Debug for Instruction {
 type FitnessScore = RegisterValue;
 
 impl<'a> Auditable for Program<'a, IrisInput> {
-    fn eval_fitness(&mut self) -> FitnessScore {
+    fn eval_fitness(&self) -> FitnessScore {
         let inputs = self.inputs;
 
         let mut fitness = Accuracy(0, 0);
 
         for input in inputs {
-            let registers = &mut self.registers;
+            let mut registers = self.registers.clone();
 
             for instruction in &self.instructions {
                 let data = match instruction.mode {
@@ -390,7 +212,7 @@ impl<'a> Auditable for Program<'a, IrisInput> {
                 };
 
                 let value = (instruction.exec)(
-                    CollectionIndexPair(registers, instruction.source_index),
+                    CollectionIndexPair(&registers, instruction.source_index),
                     CollectionIndexPair(&data, instruction.target_index),
                 );
 
@@ -406,14 +228,6 @@ impl<'a> Auditable for Program<'a, IrisInput> {
 
         fitness.calculate()
     }
-}
-
-#[derive(Debug, Clone)]
-struct HyperParameters {
-    population_size: usize,
-    n_generations: i8,
-    selection_dropout: f32,
-    input_file_path: PathBuf,
 }
 
 type Population<'a, InputType> = Collection<Program<'a, InputType>>;
@@ -449,7 +263,7 @@ impl Metric for Accuracy {
     }
 }
 
-impl<'a> Runnable<'a> for TestLGP<'a> {
+impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
     type InputType = IrisInput;
 
     fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType> {
@@ -466,7 +280,10 @@ impl<'a> Runnable<'a> for TestLGP<'a> {
         return raw_inputs;
     }
 
-    fn compete(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType> {
+    fn retrieve_selection(
+        population: Population<'a, Self::InputType>,
+        retention_rate: f32,
+    ) -> Population<'a, Self::InputType> {
         todo!()
     }
 
@@ -495,7 +312,6 @@ fn main() {
 mod tests {
     use std::{error, io::Write};
 
-    use strum::Display;
     use tempfile::NamedTempFile;
 
     use crate::iris::iris_data::IRIS_DATASET_LINK;
@@ -517,10 +333,11 @@ mod tests {
     async fn given_inputs_and_hyperparams_when_population_is_initialized_then_population_generated_with_hyperparams_and_inputs(
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
-        let inputs = <TestLGP as Runnable>::load_inputs(tmp_file.path());
+        let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
         const SIZE: usize = 100;
         const MAX_INSTRUCTIONS: usize = 100;
-        let population = <TestLGP as Runnable>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
+        let population =
+            <TestLGP as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
 
         assert!(population.len() == SIZE);
 
@@ -560,7 +377,7 @@ mod tests {
     async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmpfile) = get_iris_content().await?;
-        let inputs = <TestLGP as Runnable>::load_inputs(tmpfile.path());
+        let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(tmpfile.path());
         assert_ne!(inputs.len(), 0);
         Ok(())
     }
