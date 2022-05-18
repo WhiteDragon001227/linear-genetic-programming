@@ -2,6 +2,7 @@
 name = "linear-genetic-programming"
 version = "0.1.0"
 edition = "2021"
+author = "Urmzd Mukhammadnaim; urmzd@dal.ca"
 
 [dependencies]
 csv = "1.1"

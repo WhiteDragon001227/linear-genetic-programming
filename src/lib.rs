@@ -1,5 +1,10 @@
+pub mod algorithm;
 mod collection;
+mod fitness;
 mod inputs;
-mod iris;
+mod instruction;
+pub mod iris;
+mod metrics;
+mod program;
 mod registers;
 mod utils;
