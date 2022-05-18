@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::collection::Collection;
+use crate::containers::Collection;
 use ordered_float::OrderedFloat;
 use std::fmt;
 

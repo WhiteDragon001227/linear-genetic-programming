@@ -1,10 +1,10 @@
 pub mod algorithm;
-mod collection;
+mod containers;
 mod fitness;
 mod inputs;
-mod instruction;
+pub mod instruction;
 pub mod iris;
-mod metrics;
-mod program;
+pub mod metrics;
+pub mod program;
 mod registers;
 mod utils;

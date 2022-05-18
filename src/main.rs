@@ -1,7 +1,12 @@
 use std::{marker::PhantomData, path::Path};
 
 use csv::ReaderBuilder;
-use linear_genetic_programming::{algorithm::GeneticAlgorithm, iris::iris_data::IrisInput};
+use inputs::Inputs;
+use linear_genetic_programming::{
+    algorithm::{GeneticAlgorithm, Population},
+    iris::iris_data::IrisInput,
+    program::Program,
+};
 mod inputs;
 
 /// Lets describe the steps we're trying to execute.
@@ -96,6 +101,12 @@ impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
             .map(|_| Program::generate(inputs, max_instructions))
             .collect()
     }
+
+    fn breed(
+        population: linear_genetic_programming::algorithm::Population<'a, Self::InputType>,
+    ) -> linear_genetic_programming::algorithm::Population<'a, Self::InputType> {
+        todo!()
+    }
 }
 
 fn main() {
@@ -114,7 +125,7 @@ mod tests {
 
     use tempfile::NamedTempFile;
 
-    use crate::iris::iris_data::IRIS_DATASET_LINK;
+    use linear_genetic_programming::iris::iris_data::IRIS_DATASET_LINK;
 
     use super::*;
 

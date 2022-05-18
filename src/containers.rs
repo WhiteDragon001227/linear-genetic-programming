@@ -1,6 +1,7 @@
 use crate::registers::Registers;
 
 pub type Collection<ItemType> = Vec<ItemType>;
+
 #[derive(Debug, Clone)]
 pub struct CollectionIndexPair(Registers, pub usize);
 

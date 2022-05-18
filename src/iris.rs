@@ -1,5 +1,5 @@
 pub mod iris_ops {
-    use crate::collection::CollectionIndexPair;
+    use crate::containers::CollectionIndexPair;
     use crate::registers::RegisterValue;
     use crate::utils::AnyExecutable;
 
@@ -37,7 +37,7 @@ mod iris_impl {
     use super::iris_data::{IrisClass, IrisInput};
 
     impl<'a> Program<'a, IrisInput> {
-        fn generate(inputs: &'a Inputs<IrisInput>, max_instructions: usize) -> Self {
+        pub fn generate(inputs: &'a Inputs<IrisInput>, max_instructions: usize) -> Self {
             let register_len = <IrisInput as RegisterRepresentable>::get_number_classes();
             let registers = Registers::new(register_len);
             let input_len = <IrisInput as RegisterRepresentable>::get_number_features();

@@ -1,5 +1,5 @@
 use crate::{
-    collection::Collection,
+    containers::Collection,
     inputs::Inputs,
     instruction::Instruction,
     registers::{RegisterRepresentable, Registers},

@@ -1,4 +1,4 @@
-use crate::collection::CollectionIndexPair;
+use crate::containers::CollectionIndexPair;
 use crate::registers::{RegisterRepresentable, RegisterValue, Registers};
 use crate::utils::AnyExecutable;
 use num_derive::FromPrimitive;
