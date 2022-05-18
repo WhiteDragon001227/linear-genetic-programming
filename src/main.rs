@@ -1,13 +1,12 @@
 use std::{marker::PhantomData, path::Path};
 
 use csv::ReaderBuilder;
-use inputs::Inputs;
 use linear_genetic_programming::{
     algorithm::{GeneticAlgorithm, Population},
+    inputs::Inputs,
     iris::iris_data::IrisInput,
     program::Program,
 };
-mod inputs;
 
 /// Lets describe the steps we're trying to execute.
 ///
