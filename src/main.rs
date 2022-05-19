@@ -3,10 +3,12 @@ use std::{marker::PhantomData, path::Path};
 use csv::ReaderBuilder;
 use linear_genetic_programming::{
     algorithm::{GeneticAlgorithm, Population},
+    fitness::{Fitness, FitnessScore},
     inputs::Inputs,
     iris::iris_data::IrisInput,
     program::Program,
 };
+use rand::{prelude::SliceRandom, thread_rng};
 
 /// Lets describe the steps we're trying to execute.
 ///
@@ -84,13 +86,6 @@ impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
         return raw_inputs;
     }
 
-    fn retrieve_selection(
-        population: Population<'a, Self::InputType>,
-        retention_rate: f32,
-    ) -> Population<'a, Self::InputType> {
-        todo!()
-    }
-
     fn init_population(
         size: usize,
         max_instructions: usize,
@@ -101,10 +96,40 @@ impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
             .collect()
     }
 
-    fn breed(
-        population: linear_genetic_programming::algorithm::Population<'a, Self::InputType>,
-    ) -> linear_genetic_programming::algorithm::Population<'a, Self::InputType> {
-        todo!()
+    fn retrieve_selection(
+        population: Population<'a, Self::InputType>,
+        retention_rate: f32,
+    ) -> Population<'a, Self::InputType> {
+        assert!(retention_rate >= 0f32 && retention_rate <= 1f32);
+
+        // Ascending order.
+        let mut sorted_population = population.clone();
+        sorted_population.sort_by_cached_key(|p| p.eval_fitness());
+
+        let lowest_index =
+            (retention_rate * (sorted_population.len() as f32)).floor() as i32 as usize;
+
+        let dropped_pop = &sorted_population[..=lowest_index];
+        let mut new_pop = Vec::with_capacity(population.capacity());
+
+        for el in dropped_pop.iter() {
+            new_pop.push(el.clone())
+        }
+
+        new_pop
+    }
+
+    fn breed(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType> {
+        let remaining_size = population.capacity() - population.len();
+
+        let mut new_population = population.clone();
+
+        let new_individuals = population.choose_multiple(&mut rand::thread_rng(), remaining_size);
+        for individual in new_individuals {
+            new_population.push(individual.clone())
+        }
+
+        new_population
     }
 }
 
