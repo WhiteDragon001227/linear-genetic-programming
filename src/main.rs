@@ -3,12 +3,12 @@ use std::{marker::PhantomData, path::Path};
 use csv::ReaderBuilder;
 use linear_genetic_programming::{
     algorithm::{GeneticAlgorithm, Population},
-    fitness::{Fitness, FitnessScore},
+    fitness::Fitness,
     inputs::Inputs,
     iris::iris_data::IrisInput,
     program::Program,
 };
-use rand::{prelude::SliceRandom, thread_rng};
+use rand::prelude::SliceRandom;
 
 /// Lets describe the steps we're trying to execute.
 ///
@@ -102,17 +102,16 @@ impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
     ) -> Population<'a, Self::InputType> {
         assert!(retention_rate >= 0f32 && retention_rate <= 1f32);
 
-        // Ascending order.
         let mut sorted_population = population.clone();
         sorted_population.sort_by_cached_key(|p| p.eval_fitness());
 
         let lowest_index =
-            (retention_rate * (sorted_population.len() as f32)).floor() as i32 as usize;
+            ((1f32 - retention_rate) * (sorted_population.len() as f32)).floor() as i32 as usize;
 
-        let dropped_pop = &sorted_population[..=lowest_index];
+        let keep_pop = &sorted_population[lowest_index..];
         let mut new_pop = Vec::with_capacity(population.capacity());
 
-        for el in dropped_pop.iter() {
+        for el in keep_pop.iter() {
             new_pop.push(el.clone())
         }
 
@@ -163,6 +162,33 @@ mod tests {
     }
 
     struct ContentFilePair(String, NamedTempFile);
+
+    #[tokio::test]
+    async fn given_population_and_retention_rate_when_selection_occurs_then_population_is_cut_by_dropout(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
+
+        const SIZE: usize = 100;
+        const MAX_INSTRUCTIONS: usize = 100;
+
+        let population =
+            <TestLGP as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
+
+        const RETENTION_RATE: f32 = 0.5;
+
+        let selected_population =
+            <TestLGP as GeneticAlgorithm>::retrieve_selection(population, RETENTION_RATE);
+
+        println!("{}", selected_population.len());
+
+        assert!(
+            selected_population.len()
+                == ((SIZE as f32 * (1f32 - RETENTION_RATE)).floor() as i32 as usize)
+        );
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn given_inputs_and_hyperparams_when_population_is_initialized_then_population_generated_with_hyperparams_and_inputs(
