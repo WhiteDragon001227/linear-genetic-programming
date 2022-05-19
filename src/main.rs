@@ -146,6 +146,7 @@ fn main() {
 mod tests {
     use std::{error, io::Write};
 
+    use rand::Rng;
     use tempfile::NamedTempFile;
 
     use linear_genetic_programming::iris::iris_data::IRIS_DATASET_LINK;
@@ -164,7 +165,7 @@ mod tests {
     struct ContentFilePair(String, NamedTempFile);
 
     #[tokio::test]
-    async fn given_population_and_retention_rate_when_selection_occurs_then_population_is_cut_by_dropout(
+    async fn given_population_when_breeding_occurs_then_population_capacity_is_met(
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
         let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
@@ -172,15 +173,40 @@ mod tests {
         const SIZE: usize = 100;
         const MAX_INSTRUCTIONS: usize = 100;
 
+        let mut population =
+            <TestLGP as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
+
+        // Drop half approximately.
+        population.retain(|_| rand::thread_rng().gen_bool(0.5));
+
+        let dropped_pop_len = population.len();
+
+        assert!(dropped_pop_len < SIZE);
+
+        let new_pop = <TestLGP as GeneticAlgorithm>::breed(population);
+
+        println!("{}", new_pop.len());
+
+        assert!(new_pop.len() == SIZE);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_population_and_retention_rate_when_selection_occurs_then_population_is_cut_by_dropout(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
+
+        const SIZE: usize = 100;
+        const MAX_INSTRUCTIONS: usize = 100;
+        const RETENTION_RATE: f32 = 0.5;
+
         let population =
             <TestLGP as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
 
-        const RETENTION_RATE: f32 = 0.5;
-
         let selected_population =
             <TestLGP as GeneticAlgorithm>::retrieve_selection(population, RETENTION_RATE);
-
-        println!("{}", selected_population.len());
 
         assert!(
             selected_population.len()
