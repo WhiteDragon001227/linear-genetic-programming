@@ -1,7 +1,7 @@
-use std::{error, marker::PhantomData, path::Path};
+use std::{error, io::Write, marker::PhantomData, path::Path};
 
 use csv::ReaderBuilder;
-use linear_genetic_programming::{
+use lgp::{
     algorithm::{GeneticAlgorithm, Population},
     fitness::Fitness,
     inputs::Inputs,
@@ -143,6 +143,7 @@ async fn get_iris_content() -> Result<ContentFilePair, Box<dyn error::Error>> {
 }
 
 struct ContentFilePair(String, NamedTempFile);
+
 struct HyperParameters<'a> {
     input_path: &'a Path,
     population_size: usize,
@@ -163,7 +164,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let pop = <TestLGP as GeneticAlgorithm>::init_population(
         hyper_params.population_size,
         hyper_params.instruction_size,
-        inputs,
+        &inputs,
     );
 
     Ok(())
@@ -171,12 +172,9 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
 #[cfg(test)]
 mod tests {
-    use std::{error, io::Write};
+    use std::error;
 
     use rand::Rng;
-    use tempfile::NamedTempFile;
-
-    use linear_genetic_programming::iris::iris_data::IRIS_DATASET_LINK;
 
     use super::*;
 

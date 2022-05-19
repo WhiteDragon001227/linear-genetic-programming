@@ -1,8 +1,8 @@
 [package]
-name = "linear-gp"
+name = "lgp"
 version = "0.1.0"
 edition = "2021"
-author = "Urmzd Mukhammadnaim; urmzd@dal.ca"
+authors = ["Urmzd Mukhammadnaim; urmzd@dal.ca"]
 
 [dependencies]
 csv = "1.1"
