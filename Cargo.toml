@@ -1,5 +1,5 @@
 [package]
-name = "linear-genetic-programming"
+name = "linear-gp"
 version = "0.1.0"
 edition = "2021"
 author = "Urmzd Mukhammadnaim; urmzd@dal.ca"

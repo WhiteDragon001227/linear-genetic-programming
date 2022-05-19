@@ -1,14 +1,15 @@
-use std::{marker::PhantomData, path::Path};
+use std::{error, marker::PhantomData, path::Path};
 
 use csv::ReaderBuilder;
 use linear_genetic_programming::{
     algorithm::{GeneticAlgorithm, Population},
     fitness::Fitness,
     inputs::Inputs,
-    iris::iris_data::IrisInput,
+    iris::iris_data::{IrisInput, IRIS_DATASET_LINK},
     program::Program,
 };
 use rand::prelude::SliceRandom;
+use tempfile::NamedTempFile;
 
 /// Lets describe the steps we're trying to execute.
 ///
@@ -132,14 +133,40 @@ impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
     }
 }
 
-fn main() {
-    // TODO:
-    // 1. Load Data
-    // 2. Generate Population
-    // 3. Run Programs in Population
-    // 4. Evaluate Programs
-    // 5. Repeat From 3 until N Generations Have Been Created
-    println!("Hello, world!");
+async fn get_iris_content() -> Result<ContentFilePair, Box<dyn error::Error>> {
+    let tmp_file = NamedTempFile::new()?;
+    let response = reqwest::get(IRIS_DATASET_LINK).await?;
+    let content = response.text().await?;
+    writeln!(&tmp_file, "{}", &content)?;
+
+    Ok(ContentFilePair(content, tmp_file))
+}
+
+struct ContentFilePair(String, NamedTempFile);
+struct HyperParameters<'a> {
+    input_path: &'a Path,
+    population_size: usize,
+    instruction_size: usize,
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn error::Error>> {
+    let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+
+    let hyper_params = HyperParameters {
+        input_path: tmp_file.path(),
+        population_size: 100,
+        instruction_size: 100,
+    };
+
+    let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(hyper_params.input_path);
+    let pop = <TestLGP as GeneticAlgorithm>::init_population(
+        hyper_params.population_size,
+        hyper_params.instruction_size,
+        inputs,
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -152,17 +179,6 @@ mod tests {
     use linear_genetic_programming::iris::iris_data::IRIS_DATASET_LINK;
 
     use super::*;
-
-    async fn get_iris_content() -> Result<ContentFilePair, Box<dyn error::Error>> {
-        let tmp_file = NamedTempFile::new()?;
-        let response = reqwest::get(IRIS_DATASET_LINK).await?;
-        let content = response.text().await?;
-        writeln!(&tmp_file, "{}", &content)?;
-
-        Ok(ContentFilePair(content, tmp_file))
-    }
-
-    struct ContentFilePair(String, NamedTempFile);
 
     #[tokio::test]
     async fn given_population_when_breeding_occurs_then_population_capacity_is_met(
