@@ -81,9 +81,18 @@ impl Instruction {
         assert!(data_len != 0);
 
         let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut thread_rng());
-        let target_index = UniformInt::<usize>::new(0, data_len).sample(&mut thread_rng());
-        let exec = executables.choose(&mut thread_rng()).unwrap();
         let mode = StdRng::from_entropy().sample(Standard);
+        let target_index = UniformInt::<usize>::new(
+            0,
+            if mode == Modes::Input {
+                data_len
+            } else {
+                registers_len
+            },
+        )
+        .sample(&mut thread_rng());
+        let exec = executables.choose(&mut thread_rng()).unwrap();
+        // update target index
 
         Instruction {
             source_index,

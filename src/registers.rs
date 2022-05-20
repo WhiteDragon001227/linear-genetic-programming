@@ -37,11 +37,12 @@ impl Registers {
     }
 
     pub fn get_value_at_index(&self, index: usize) -> RegisterValue {
-        if index < self.len() {
+        let len = self.len();
+        if index < len {
             return self.0[index];
         }
 
-        panic!("Invalid index")
+        panic!("Invalid Index: {}; Len: {}", index, len)
     }
 
     /// Returns:
