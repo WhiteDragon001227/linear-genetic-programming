@@ -1,9 +1,9 @@
-use std::{error, io::Write, marker::PhantomData, path::Path};
+use std::{error, io::Write, path::Path};
 
 use csv::ReaderBuilder;
 use lgp::{
     algorithm::{GeneticAlgorithm, HyperParameters, Population},
-    fitness::{Fitness, FitnessScore},
+    fitness::Fitness,
     inputs::Inputs,
     iris::iris_data::{IrisInput, IRIS_DATASET_LINK},
     program::Program,
@@ -74,7 +74,7 @@ where
     InputType: RegisterRepresentable,
 {
     population: Population<'a, InputType>,
-    inputs: Inputs<InputType>,
+    inputs: &'a Inputs<InputType>,
     hyper_params: HyperParameters,
 }
 
@@ -96,29 +96,31 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
         return raw_inputs;
     }
 
-    fn new(hyper_params: lgp::algorithm::HyperParameters<'a>) -> Self {
-        let inputs = Self::load_inputs(hyper_params.input_path);
+    fn new(
+        hyper_params: lgp::algorithm::HyperParameters,
+        inputs: &'a Inputs<Self::InputType>,
+    ) -> Self {
         let population: Population<'a, Self::InputType> =
             Vec::with_capacity(hyper_params.population_size);
 
-        return BasicLGP(population, inputs, hyper_params);
+        BasicLGP {
+            population,
+            inputs,
+            hyper_params,
+        }
     }
 
-    fn init_population(&mut self) -> Self {
-        let BasicLGP {
-            population,
-            hyper_params,
-            inputs,
-        } = &self;
-        for _ in 0..hyper_params.population_size {
-            let program = Program::generate(inputs, hyper_params.instruction_size);
-            population.push(program)
+    fn init_population(&mut self) -> &mut Self {
+        for _ in 0..self.hyper_params.population_size {
+            let program = Program::generate(&self.inputs, self.hyper_params.instruction_size);
+            self.population.push(program)
         }
+
         self
     }
 
-    fn eval_population(&mut self) -> Self {
-        for individual in self.population {
+    fn eval_population(&mut self) -> &mut Self {
+        for individual in &mut self.population {
             let fitness = individual.eval_fitness();
             individual.fitness = Some(fitness);
         }
@@ -127,32 +129,33 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
         self
     }
 
-    fn apply_natural_selection(&mut self) -> Self {
+    fn apply_natural_selection(&mut self) -> &mut Self {
+        let HyperParameters { retention_rate, .. } = self.hyper_params;
+
         assert!(retention_rate >= 0f32 && retention_rate <= 1f32);
-        assert!(self.population.is_sorted());
 
         let pop_len = self.population.len();
-
-        let HyperParameters { retention_rate, .. } = &self;
 
         let lowest_index = ((1f32 - retention_rate) * (pop_len as f32)).floor() as i32 as usize;
 
         for index in 0..lowest_index {
-            self.population.remove(index)
+            self.population.remove(index);
         }
 
         self
     }
 
-    fn breed(&mut self) -> Self {
-        let Self { population, .. } = &mut self;
+    fn breed(&mut self) -> &mut Self {
+        let Self { population, .. } = self;
         let remaining_size = population.capacity() - population.len();
 
-        let selected_individuals =
-            population.choose_multiple(&mut rand::thread_rng(), remaining_size);
+        let selected_individuals: Population<'a, Self::InputType> = population
+            .choose_multiple(&mut rand::thread_rng(), remaining_size)
+            .cloned()
+            .collect();
 
         for individual in selected_individuals {
-            population.push(individual.clone())
+            population.push(individual)
         }
 
         self
@@ -172,169 +175,176 @@ struct ContentFilePair(String, NamedTempFile);
 
 // Lo, Mid, Hi
 struct Benchmark<'a, InputType: RegisterRepresentable>(
-    &'a Program<'a, InputType>,
-    &'a Program<'a, InputType>,
-    &'a Program<'a, InputType>,
+    Program<'a, InputType>,
+    Program<'a, InputType>,
+    Program<'a, InputType>,
 );
 
-impl<'a, InputType> Benchmark<'a, InputType>
+trait BenchmarkMetric<'a>
+where
+    Self::InputType: RegisterRepresentable,
+{
+    type InputType;
+    fn get_benchmark_individuals(&self) -> Benchmark<'a, Self::InputType>;
+}
+
+impl<'a, InputType> BenchmarkMetric<'a> for BasicLGP<'a, InputType>
 where
     InputType: RegisterRepresentable,
 {
-    fn get_benchmark_individuals(population: &'a Population<'a, InputType>) -> Self {
-        let worst = population.first().unwrap();
-        let middle_index = math::round::floor(population.len() as f64 / 2 as f64, 1) as usize;
-        let median = population.get(middle_index).unwrap();
-        let best = population.last().unwrap();
+    type InputType = InputType;
 
-        return Benchmark(worst, median, best);
+    fn get_benchmark_individuals(&self) -> Benchmark<'a, Self::InputType> {
+        let Self { population, .. } = self;
+        let worst = population.first();
+        let median_index = math::round::floor(population.len() as f64 / 2 as f64, 1) as usize;
+        let median = population.get(median_index);
+        let best = population.last();
+
+        Benchmark::<'a, Self::InputType>(
+            worst.unwrap().clone(),
+            median.unwrap().clone(),
+            best.unwrap().clone(),
+        )
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn error::Error>> {
-    /*
-     *    let ContentFilePair(_, tmp_file) = get_iris_content().await?;
-     *
-     *    let hyper_params = HyperParameters {
-     *        input_path: tmp_file.path(),
-     *        population_size: 100,
-     *        instruction_size: 100,
-     *        retention_rate: 0.5,
-     *    };
-     *
-     *    let inputs = <BasicLGP as GeneticAlgorithm>::load_inputs(hyper_params.input_path);
-     *    let mut pop = <BasicLGP as GeneticAlgorithm>::init_population(
-     *        hyper_params.population_size,
-     *        hyper_params.instruction_size,
-     *        &inputs,
-     *    );
-     *
-     *    pop.sort_by_cached_key(|p| p.eval_fitness());
-     *
-     *    let Benchmark(worst, median, best) = Benchmark::get_benchmark_individuals(&pop);
-     *
-     *    while worst != median && median != best {
-     *        pop = <BasicLGP as GeneticAlgorithm>::retrieve_selection(&pop, hyper_params.retention_rate);
-     *        pop = <BasicLGP as GeneticAlgorithm>::breed(pop);
-     *    }
-     */
+    let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+
+    let hyper_params = HyperParameters {
+        population_size: 100,
+        instruction_size: 100,
+        retention_rate: 0.5,
+    };
+
+    let inputs = <BasicLGP<IrisInput> as GeneticAlgorithm>::load_inputs(tmp_file.path());
+    let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
+    gp.init_population().eval_population();
+    let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
+
+    while worst != median && median != best {
+        gp.apply_natural_selection().breed();
+
+        Benchmark(worst, median, best) = gp.get_benchmark_individuals();
+    }
 
     Ok(())
 }
 
-/*
- *#[cfg(test)]
- *mod tests {
- *    use std::error;
- *
- *    use rand::Rng;
- *
- *    use super::*;
- *
- *    #[tokio::test]
- *    async fn given_population_when_breeding_occurs_then_population_capacity_is_met(
- *    ) -> Result<(), Box<dyn error::Error>> {
- *        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
- *        let inputs = <BasicLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
- *
- *        const SIZE: usize = 100;
- *        const MAX_INSTRUCTIONS: usize = 100;
- *
- *        let mut population =
- *            <BasicLGP as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
- *
- *        // Drop half approximately.
- *        population.retain(|_| rand::thread_rng().gen_bool(0.5));
- *
- *        let dropped_pop_len = population.len();
- *
- *        assert!(dropped_pop_len < SIZE);
- *
- *        let new_pop = <BasicLGP as GeneticAlgorithm>::breed(population);
- *
- *        println!("{}", new_pop.len());
- *
- *        assert!(new_pop.len() == SIZE);
- *
- *        Ok(())
- *    }
- *
- *    #[tokio::test]
- *    async fn given_population_and_retention_rate_when_selection_occurs_then_population_is_cut_by_dropout(
- *    ) -> Result<(), Box<dyn error::Error>> {
- *        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
- *        let inputs = <BasicLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
- *
- *        const SIZE: usize = 100;
- *        const MAX_INSTRUCTIONS: usize = 100;
- *        const RETENTION_RATE: f32 = 0.5;
- *
- *        let population =
- *            <BasicLGP as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
- *
- *        let selected_population =
- *            <BasicLGP as GeneticAlgorithm>::retrieve_selection(population, RETENTION_RATE);
- *
- *        assert!(
- *            selected_population.len()
- *                == ((SIZE as f32 * (1f32 - RETENTION_RATE)).floor() as i32 as usize)
- *        );
- *
- *        Ok(())
- *    }
- *
- *    #[tokio::test]
- *    async fn given_inputs_and_hyperparams_when_population_is_initialized_then_population_generated_with_hyperparams_and_inputs(
- *    ) -> Result<(), Box<dyn error::Error>> {
- *        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
- *        let inputs = <BasicLGP as GeneticAlgorithm>::load_inputs(tmp_file.path());
- *        const SIZE: usize = 100;
- *        const MAX_INSTRUCTIONS: usize = 100;
- *        let population =
- *            <BasicLGP<IrisInput> as GeneticAlgorithm>::init_population(SIZE, MAX_INSTRUCTIONS, &inputs);
- *
- *        assert!(population.len() == SIZE);
- *
- *        for individual in population {
- *            assert!(individual.instructions.len() <= SIZE)
- *        }
- *
- *        Ok(())
- *    }
- *
- *    #[tokio::test]
- *    async fn given_iris_dataset_when_csv_is_read_then_rows_are_deserialized_as_structs(
- *    ) -> Result<(), Box<dyn error::Error>> {
- *        let ContentFilePair(content, _) = get_iris_content().await?;
- *        assert_ne!(content.len(), 0);
- *
- *        let content_bytes = content.as_bytes();
- *
- *        let mut reader = csv::ReaderBuilder::new()
- *            .has_headers(false)
- *            .from_reader(content_bytes);
- *
- *        let data = reader.deserialize();
- *        let mut count = 0;
- *
- *        for result in data {
- *            let _record: IrisInput = result?;
- *            count += 1;
- *        }
- *
- *        assert_ne!(count, 0);
- *
- *        Ok(())
- *    }
- *
- *    #[tokio::test]
- *    async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
- *    ) -> Result<(), Box<dyn error::Error>> {
- *        let ContentFilePair(_, tmpfile) = get_iris_content().await?;
- *        let inputs = <BasicLGP<IrisInput> as GeneticAlgorithm>::load_inputs(tmpfile.path());
- *        assert_ne!(inputs.len(), 0);
- *        Ok(())
- *    }
- *}
- */
+#[cfg(test)]
+mod tests {
+    use std::error;
+
+    use rand::Rng;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn given_population_when_breeding_occurs_then_population_capacity_is_met(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = <BasicLGP<IrisInput> as GeneticAlgorithm>::load_inputs(tmp_file.path());
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            instruction_size: 100,
+            retention_rate: 0.5,
+        };
+        let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
+        gp.init_population();
+
+        // Drop half approximately.
+        gp.population
+            .retain(|_| rand::thread_rng().gen_bool(hyper_params.retention_rate as f64));
+
+        let dropped_pop_len = gp.population.len();
+
+        assert!(dropped_pop_len < hyper_params.population_size);
+
+        gp.breed();
+
+        assert!(gp.population.len() == hyper_params.population_size);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_population_and_retention_rate_when_selection_occurs_then_population_is_cut_by_dropout(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = <BasicLGP<IrisInput> as GeneticAlgorithm>::load_inputs(tmp_file.path());
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            instruction_size: 100,
+            retention_rate: 0.5,
+        };
+        let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
+        gp.init_population().apply_natural_selection();
+
+        assert!(
+            gp.population.len()
+                == ((hyper_params.population_size as f32 * (1f32 - hyper_params.retention_rate))
+                    .floor() as i32 as usize)
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_inputs_and_hyperparams_when_population_is_initialized_then_population_generated_with_hyperparams_and_inputs(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = <BasicLGP<IrisInput> as GeneticAlgorithm>::load_inputs(tmp_file.path());
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            instruction_size: 100,
+            retention_rate: 0.5,
+        };
+
+        let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
+        gp.init_population();
+
+        assert!(gp.population.len() == hyper_params.population_size);
+
+        for individual in gp.population {
+            assert!(individual.instructions.len() <= hyper_params.instruction_size)
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_iris_dataset_when_csv_is_read_then_rows_are_deserialized_as_structs(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(content, _) = get_iris_content().await?;
+        assert_ne!(content.len(), 0);
+
+        let content_bytes = content.as_bytes();
+
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(content_bytes);
+
+        let data = reader.deserialize();
+        let mut count = 0;
+
+        for result in data {
+            let _record: IrisInput = result?;
+            count += 1;
+        }
+
+        assert_ne!(count, 0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let ContentFilePair(_, tmpfile) = get_iris_content().await?;
+        let inputs = <BasicLGP<IrisInput> as GeneticAlgorithm>::load_inputs(tmpfile.path());
+        assert_ne!(inputs.len(), 0);
+        Ok(())
+    }
+}

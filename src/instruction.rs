@@ -65,7 +65,6 @@ impl Instruction {
         let target_data = match &self.mode {
             Modes::Input => input.clone().into(),
             Modes::Registers => registers.clone(),
-            _ => unreachable!("This should never happen."),
         };
 
         let target_data = CollectionIndexPair::new(target_data, self.target_index);

@@ -6,7 +6,7 @@ use std::fmt;
 
 pub type RegisterValue = OrderedFloat<f32>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct Registers(Collection<RegisterValue>);
 
 impl Registers {
@@ -34,6 +34,14 @@ impl Registers {
     pub fn update(&mut self, index: usize, value: RegisterValue) -> () {
         let Registers(internal_values) = self;
         internal_values[index] = value
+    }
+
+    pub fn get_value_at_index(&self, index: usize) -> RegisterValue {
+        if index < self.len() {
+            return self.0[index];
+        }
+
+        panic!("Invalid index")
     }
 
     /// Returns:
@@ -65,7 +73,7 @@ impl Registers {
     }
 }
 
-pub trait RegisterRepresentable: fmt::Debug + Into<Registers> + Clone {
+pub trait RegisterRepresentable: fmt::Debug + Into<Registers> + Clone + PartialEq {
     fn get_number_classes() -> usize;
     fn get_number_features() -> usize;
 }

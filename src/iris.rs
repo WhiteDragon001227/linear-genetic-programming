@@ -1,21 +1,28 @@
 pub mod iris_ops {
+    use ordered_float::OrderedFloat;
+
     use crate::containers::CollectionIndexPair;
     use crate::registers::RegisterValue;
     use crate::utils::AnyExecutable;
 
     fn add(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
-        ordered_float::OrderedFloat(0.)
+        registers.get_value() + data.get_value()
     }
 
     fn subtract(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
-        ordered_float::OrderedFloat(0.)
+        registers.get_value() - data.get_value()
     }
 
     fn divide(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
-        ordered_float::OrderedFloat(0.)
+        registers.get_value() / OrderedFloat(2f32)
     }
 
-    pub const EXECUTABLES: &'static [AnyExecutable; 3] = &[self::add, self::subtract, self::divide];
+    fn multiply(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
+        registers.get_value() * data.get_value()
+    }
+
+    pub const EXECUTABLES: &'static [AnyExecutable; 4] =
+        &[self::add, self::subtract, self::divide, self::multiply];
 }
 
 mod iris_impl {

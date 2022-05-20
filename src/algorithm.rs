@@ -7,8 +7,8 @@ use std::path::Path;
 pub type Population<'a, InputType> = Collection<Program<'a, InputType>>;
 pub type PopulationSlice<'a, InputType> = &'a [Program<'a, InputType>];
 
-pub struct HyperParameters<'a> {
-    pub input_path: &'a Path,
+#[derive(Clone, Copy, Debug)]
+pub struct HyperParameters {
     pub population_size: usize,
     pub instruction_size: usize,
     pub retention_rate: f32,
@@ -22,13 +22,13 @@ where
 
     fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType>;
 
-    fn new(hyper_params: HyperParameters<'a>) -> Self;
+    fn new(hyper_params: HyperParameters, inputs: &'a Inputs<Self::InputType>) -> Self;
 
-    fn init_population(&mut self) -> Self;
+    fn init_population(&mut self) -> &mut Self;
 
-    fn eval_population(&mut self) -> Self;
+    fn eval_population(&mut self) -> &mut Self;
 
-    fn apply_natural_selection(&mut self) -> Self;
+    fn apply_natural_selection(&mut self) -> &mut Self;
 
-    fn breed(&mut self) -> Self;
+    fn breed(&mut self) -> &mut Self;
 }
