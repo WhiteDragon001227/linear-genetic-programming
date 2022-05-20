@@ -1,4 +1,4 @@
-use std::{error, io::Write, path::Path};
+use std::{error, io::Write, path::Path, ptr};
 
 use csv::ReaderBuilder;
 use lgp::{
@@ -175,9 +175,9 @@ struct ContentFilePair(String, NamedTempFile);
 
 // Lo, Mid, Hi
 struct Benchmark<'a, InputType: RegisterRepresentable>(
-    Program<'a, InputType>,
-    Program<'a, InputType>,
-    Program<'a, InputType>,
+    &'a Program<'a, InputType>,
+    &'a Program<'a, InputType>,
+    &'a Program<'a, InputType>,
 );
 
 trait BenchmarkMetric<'a>
@@ -185,7 +185,7 @@ where
     Self::InputType: RegisterRepresentable,
 {
     type InputType;
-    fn get_benchmark_individuals(&self) -> Benchmark<'a, Self::InputType>;
+    fn get_benchmark_individuals(&'a self) -> Benchmark<'a, Self::InputType>;
 }
 
 impl<'a, InputType> BenchmarkMetric<'a> for BasicLGP<'a, InputType>
@@ -194,18 +194,13 @@ where
 {
     type InputType = InputType;
 
-    fn get_benchmark_individuals(&self) -> Benchmark<'a, Self::InputType> {
-        let Self { population, .. } = self;
-        let worst = population.first();
-        let median_index = math::round::floor(population.len() as f64 / 2 as f64, 1) as usize;
-        let median = population.get(median_index);
-        let best = population.last();
+    fn get_benchmark_individuals(&'a self) -> Benchmark<'a, Self::InputType> {
+        let worst = self.population.first();
+        let median_index = math::round::floor(self.population.len() as f64 / 2 as f64, 1) as usize;
+        let median = self.population.get(median_index);
+        let best = self.population.last();
 
-        Benchmark::<'a, Self::InputType>(
-            worst.unwrap().clone(),
-            median.unwrap().clone(),
-            best.unwrap().clone(),
-        )
+        Benchmark::<'a, Self::InputType>(worst.unwrap(), median.unwrap(), best.unwrap())
     }
 }
 
@@ -224,10 +219,16 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     gp.init_population().eval_population();
     let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
 
-    while worst != median && median != best {
+    while !ptr::eq(worst, median) && !ptr::eq(median, best) {
         gp.apply_natural_selection().breed();
 
         Benchmark(worst, median, best) = gp.get_benchmark_individuals();
+        println!(
+            "{:.5} {:.5} {:.5}",
+            worst.fitness.unwrap(),
+            median.fitness.unwrap(),
+            best.fitness.unwrap()
+        )
     }
 
     Ok(())

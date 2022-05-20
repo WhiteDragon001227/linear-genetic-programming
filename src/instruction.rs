@@ -13,7 +13,11 @@ use strum::EnumCount;
 
 impl Debug for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("Instruction")
+            .field("mode", &self.mode)
+            .field("source_index", &self.source_index)
+            .field("target_index", &self.target_index)
+            .finish()
     }
 }
 
