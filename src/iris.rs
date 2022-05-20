@@ -19,6 +19,7 @@ pub mod iris_ops {
 }
 
 mod iris_impl {
+    use ordered_float::OrderedFloat;
     use rand::{
         distributions::uniform::{UniformInt, UniformSampler},
         thread_rng,
@@ -55,6 +56,7 @@ mod iris_impl {
                 instructions,
                 registers,
                 inputs,
+                fitness: None,
             }
         }
     }
@@ -84,7 +86,9 @@ mod iris_impl {
                 registers.reset();
             }
 
-            fitness.calculate()
+            let fitness_score = fitness.calculate();
+
+            fitness_score
         }
     }
 }

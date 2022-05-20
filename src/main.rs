@@ -3,10 +3,11 @@ use std::{error, io::Write, marker::PhantomData, path::Path};
 use csv::ReaderBuilder;
 use lgp::{
     algorithm::{GeneticAlgorithm, Population},
-    fitness::Fitness,
+    fitness::{Fitness, FitnessScore},
     inputs::Inputs,
     iris::iris_data::{IrisInput, IRIS_DATASET_LINK},
     program::Program,
+    registers::RegisterRepresentable,
 };
 use rand::prelude::SliceRandom;
 use tempfile::NamedTempFile;
@@ -103,13 +104,20 @@ impl<'a> GeneticAlgorithm<'a> for TestLGP<'a> {
     ) -> Population<'a, Self::InputType> {
         assert!(retention_rate >= 0f32 && retention_rate <= 1f32);
 
-        let mut sorted_population = population.clone();
-        sorted_population.sort_by_cached_key(|p| p.eval_fitness());
+        let mut pop_with_fitness: Population<'a, Self::InputType> = population
+            .iter()
+            .map(|p| Program {
+                fitness: Some(p.eval_fitness()),
+                ..p.clone()
+            })
+            .collect();
+
+        pop_with_fitness.sort_by_cached_key(|p| p.fitness.unwrap());
 
         let lowest_index =
-            ((1f32 - retention_rate) * (sorted_population.len() as f32)).floor() as i32 as usize;
+            ((1f32 - retention_rate) * (pop_with_fitness.len() as f32)).floor() as i32 as usize;
 
-        let keep_pop = &sorted_population[lowest_index..];
+        let keep_pop = &pop_with_fitness[lowest_index..];
         let mut new_pop = Vec::with_capacity(population.capacity());
 
         for el in keep_pop.iter() {
@@ -148,6 +156,28 @@ struct HyperParameters<'a> {
     input_path: &'a Path,
     population_size: usize,
     instruction_size: usize,
+    retention_rate: f32,
+}
+
+// Lo, Mid, Hi
+struct Benchmark<'a, InputType: RegisterRepresentable>(
+    &'a Program<'a, InputType>,
+    &'a Program<'a, InputType>,
+    &'a Program<'a, InputType>,
+);
+
+impl<'a, InputType> Benchmark<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    fn get_benchmark_individuals(population: &'a Population<'a, InputType>) -> Self {
+        let worst = population.first().unwrap();
+        let middle_index = math::round::floor(population.len() as f64 / 2 as f64, 1) as usize;
+        let median = population.get(middle_index).unwrap();
+        let best = population.last().unwrap();
+
+        return Benchmark(worst, median, best);
+    }
 }
 
 #[tokio::main]
@@ -158,14 +188,26 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
         input_path: tmp_file.path(),
         population_size: 100,
         instruction_size: 100,
+        retention_rate: 0.5,
     };
 
     let inputs = <TestLGP as GeneticAlgorithm>::load_inputs(hyper_params.input_path);
-    let pop = <TestLGP as GeneticAlgorithm>::init_population(
+    let mut pop = <TestLGP as GeneticAlgorithm>::init_population(
         hyper_params.population_size,
         hyper_params.instruction_size,
         &inputs,
     );
+
+    pop.sort_by_cached_key(|p| p.eval_fitness());
+
+    let get_benchmark_individuals = |population: &Population<IrisInput>| {};
+
+    let Benchmark(worst, median, best) = get_benchmark_individuals(&pop);
+
+    while worst != median && median != best {
+        pop = <TestLGP as GeneticAlgorithm>::retrieve_selection(pop, hyper_params.retention_rate);
+        pop = <TestLGP as GeneticAlgorithm>::breed(pop);
+    }
 
     Ok(())
 }

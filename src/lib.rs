@@ -6,5 +6,5 @@ pub mod instruction;
 pub mod iris;
 pub mod metrics;
 pub mod program;
-mod registers;
+pub mod registers;
 mod utils;

@@ -6,9 +6,9 @@ use rand::distributions::uniform::{UniformInt, UniformSampler};
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{distributions::Standard, prelude::Distribution};
 use rand::{thread_rng, Rng, SeedableRng};
+use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::{clone, fmt};
 use strum::EnumCount;
 
 impl Debug for Instruction {
@@ -17,7 +17,7 @@ impl Debug for Instruction {
     }
 }
 
-#[derive(FromPrimitive, Clone, Debug, EnumCount)]
+#[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq)]
 pub enum Modes {
     Input = 0,
     Registers = 1,
@@ -35,7 +35,7 @@ impl Distribution<Modes> for Standard {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Instruction {
     source_index: usize,
     target_index: usize,

@@ -6,7 +6,7 @@ use std::fmt;
 
 pub type RegisterValue = OrderedFloat<f32>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Registers(Collection<RegisterValue>);
 
 impl Registers {
