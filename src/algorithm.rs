@@ -5,6 +5,15 @@ use crate::registers::RegisterRepresentable;
 use std::path::Path;
 
 pub type Population<'a, InputType> = Collection<Program<'a, InputType>>;
+pub type PopulationSlice<'a, InputType> = &'a [Program<'a, InputType>];
+
+pub struct HyperParameters<'a> {
+    pub input_path: &'a Path,
+    pub population_size: usize,
+    pub instruction_size: usize,
+    pub retention_rate: f32,
+}
+
 pub trait GeneticAlgorithm<'a>
 where
     Self::InputType: RegisterRepresentable,
@@ -13,16 +22,13 @@ where
 
     fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType>;
 
-    fn init_population(
-        size: usize,
-        max_instructions: usize,
-        inputs: &'a Inputs<Self::InputType>,
-    ) -> Population<'a, Self::InputType>;
+    fn new(hyper_params: HyperParameters<'a>) -> Self;
 
-    fn retrieve_selection(
-        population: Population<'a, Self::InputType>,
-        retention_rate: f32,
-    ) -> Population<'a, Self::InputType>;
+    fn init_population(&mut self) -> Self;
 
-    fn breed(population: Population<'a, Self::InputType>) -> Population<'a, Self::InputType>;
+    fn eval_population(&mut self) -> Self;
+
+    fn apply_natural_selection(&mut self) -> Self;
+
+    fn breed(&mut self) -> Self;
 }
