@@ -1,18 +1,20 @@
 use crate::registers::{RegisterValue, Registers};
 
-pub type Collection<ItemType> = Vec<ItemType>;
-
 #[derive(Debug, Clone)]
-pub struct CollectionIndexPair(pub Registers, pub usize);
+pub struct CollectionIndexPair(Registers, usize);
 
 impl CollectionIndexPair {
     pub fn new(data: Registers, index: usize) -> Self {
-        CollectionIndexPair(data, index)
+        Self(data, index)
     }
 
     pub fn get_value(&self) -> RegisterValue {
-        let CollectionIndexPair(internal_registers, index) = self;
+        let Self(internal_registers, index) = self;
 
         internal_registers.get_value_at_index(*index)
+    }
+
+    pub fn get_index(&self) -> usize {
+        self.1
     }
 }

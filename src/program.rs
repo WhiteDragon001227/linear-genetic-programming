@@ -1,5 +1,4 @@
 use crate::{
-    containers::Collection,
     fitness::FitnessScore,
     inputs::Inputs,
     instruction::Instruction,
@@ -11,10 +10,19 @@ pub struct Program<'a, InputType>
 where
     InputType: RegisterRepresentable,
 {
-    pub instructions: Collection<Instruction>,
+    pub instructions: Vec<Instruction>,
     pub inputs: &'a Inputs<InputType>,
     pub registers: Registers,
     pub fitness: Option<FitnessScore>,
+}
+
+impl<'a, InputType> Ord for Program<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.fitness.cmp(&other.fitness)
+    }
 }
 
 impl<'a, InputType> PartialOrd for Program<'a, InputType>

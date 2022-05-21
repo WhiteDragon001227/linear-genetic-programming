@@ -1,20 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::containers::Collection;
 use ordered_float::OrderedFloat;
 use std::fmt;
 
 pub type RegisterValue = OrderedFloat<f32>;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct Registers(Collection<RegisterValue>);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Registers(Vec<RegisterValue>);
 
 impl Registers {
     pub fn new(n_registers: usize) -> Registers {
         Registers(vec![OrderedFloat(0f32); n_registers])
     }
 
-    pub fn from(vec: Collection<RegisterValue>) -> Registers {
+    pub fn from(vec: Vec<RegisterValue>) -> Registers {
         Registers(vec)
     }
 
@@ -74,7 +73,9 @@ impl Registers {
     }
 }
 
-pub trait RegisterRepresentable: fmt::Debug + Into<Registers> + Clone + PartialEq {
+pub trait RegisterRepresentable:
+    fmt::Debug + Into<Registers> + Clone + PartialEq + Eq + PartialOrd + Ord
+{
     fn get_number_classes() -> usize;
     fn get_number_features() -> usize;
 }

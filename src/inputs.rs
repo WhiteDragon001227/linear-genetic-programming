@@ -1,2 +1,1 @@
-use crate::containers::Collection;
-pub type Inputs<InputType> = Collection<InputType>;
+pub type Inputs<InputType> = Vec<InputType>;

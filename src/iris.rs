@@ -5,19 +5,19 @@ pub mod iris_ops {
     use crate::registers::RegisterValue;
     use crate::utils::AnyExecutable;
 
-    fn add(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
+    fn add(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
         registers.get_value() + data.get_value()
     }
 
-    fn subtract(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
+    fn subtract(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
         registers.get_value() - data.get_value()
     }
 
-    fn divide(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
+    fn divide(registers: &CollectionIndexPair, _data: &CollectionIndexPair) -> RegisterValue {
         registers.get_value() / OrderedFloat(2f32)
     }
 
-    fn multiply(registers: CollectionIndexPair, data: CollectionIndexPair) -> RegisterValue {
+    fn multiply(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
         registers.get_value() * data.get_value()
     }
 
@@ -26,7 +26,6 @@ pub mod iris_ops {
 }
 
 mod iris_impl {
-    use ordered_float::OrderedFloat;
     use rand::{
         distributions::uniform::{UniformInt, UniformSampler},
         thread_rng,
@@ -78,9 +77,9 @@ mod iris_impl {
                 let mut registers = self.registers.clone();
 
                 for instruction in &self.instructions {
-                    let [source_data, target_data] = instruction.get_data(&mut registers, input);
+                    let [source_data, target_data] = instruction.get_data(&registers, input);
 
-                    instruction.apply(source_data, target_data);
+                    instruction.apply(&mut registers, source_data, target_data);
                 }
 
                 let correct_index = input.class as usize;
@@ -90,6 +89,7 @@ mod iris_impl {
                     &mut fitness,
                     Some(correct_index) == registers_argmax,
                 );
+
                 registers.reset();
             }
 
@@ -115,19 +115,19 @@ pub mod iris_data {
     pub const IRIS_DATASET_LINK: &'static str =
         "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
 
-    #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount)]
+    #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, PartialOrd, Ord)]
     pub enum IrisClass {
         Setosa = 0,
         Versicolour = 1,
         Virginica = 2,
     }
 
-    #[derive(Deserialize, Debug, Clone, PartialEq)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq)]
     pub struct IrisInput {
-        sepal_length: f32,
-        sepal_width: f32,
-        petal_length: f32,
-        petal_width: f32,
+        sepal_length: OrderedFloat<f32>,
+        sepal_width: OrderedFloat<f32>,
+        petal_length: OrderedFloat<f32>,
+        petal_width: OrderedFloat<f32>,
         #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
         pub class: IrisClass,
     }
@@ -145,10 +145,10 @@ pub mod iris_data {
     impl Into<Registers> for IrisInput {
         fn into(self) -> Registers {
             return Registers::from(vec![
-                OrderedFloat(self.sepal_length),
-                OrderedFloat(self.sepal_width),
-                OrderedFloat(self.petal_length),
-                OrderedFloat(self.petal_width),
+                self.sepal_length,
+                self.sepal_width,
+                self.petal_length,
+                self.petal_width,
             ]);
         }
     }

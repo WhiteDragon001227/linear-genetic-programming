@@ -1,4 +1,4 @@
-use std::{error, io::Write, path::Path, ptr};
+use std::{collections::VecDeque, error, io::Write, path::Path, ptr};
 
 use csv::ReaderBuilder;
 use lgp::{
@@ -9,7 +9,7 @@ use lgp::{
     program::Program,
     registers::RegisterRepresentable,
 };
-use rand::prelude::SliceRandom;
+use rand::seq::IteratorRandom;
 use tempfile::NamedTempFile;
 
 /// Lets describe the steps we're trying to execute.
@@ -101,7 +101,7 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
         inputs: &'a Inputs<Self::InputType>,
     ) -> Self {
         let population: Population<'a, Self::InputType> =
-            Vec::with_capacity(hyper_params.population_size);
+            VecDeque::with_capacity(hyper_params.population_size);
 
         BasicLGP {
             population,
@@ -113,7 +113,7 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
     fn init_population(&mut self) -> &mut Self {
         for _ in 0..self.hyper_params.population_size {
             let program = Program::generate(&self.inputs, self.hyper_params.instruction_size);
-            self.population.push(program)
+            self.population.push_front(program)
         }
 
         self
@@ -125,7 +125,6 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
             individual.fitness = Some(fitness);
         }
 
-        self.population.sort_by_key(|p| p.fitness.unwrap());
         self
     }
 
@@ -138,8 +137,10 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
 
         let lowest_index = ((1f32 - retention_rate) * (pop_len as f32)).floor() as i32 as usize;
 
-        for index in 0..lowest_index {
-            self.population.remove(index);
+        self.population.make_contiguous().sort();
+
+        for _ in 0..=lowest_index {
+            self.population.pop_front();
         }
 
         self
@@ -149,13 +150,13 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
         let Self { population, .. } = self;
         let remaining_size = population.capacity() - population.len();
 
-        let selected_individuals: Population<'a, Self::InputType> = population
-            .choose_multiple(&mut rand::thread_rng(), remaining_size)
+        let selected_individuals: Vec<Program<'a, Self::InputType>> = population
+            .iter()
             .cloned()
-            .collect();
+            .choose_multiple(&mut rand::thread_rng(), remaining_size);
 
         for individual in selected_individuals {
-            population.push(individual)
+            population.push_back(individual)
         }
 
         self
@@ -174,18 +175,14 @@ async fn get_iris_content() -> Result<ContentFilePair, Box<dyn error::Error>> {
 struct ContentFilePair(String, NamedTempFile);
 
 // Lo, Mid, Hi
-struct Benchmark<'a, InputType: RegisterRepresentable>(
-    &'a Program<'a, InputType>,
-    &'a Program<'a, InputType>,
-    &'a Program<'a, InputType>,
-);
+struct Benchmark<'a, P>(&'a P, &'a P, &'a P);
 
 trait BenchmarkMetric<'a>
 where
     Self::InputType: RegisterRepresentable,
 {
     type InputType;
-    fn get_benchmark_individuals(&'a self) -> Benchmark<'a, Self::InputType>;
+    fn get_benchmark_individuals(&'a self) -> Benchmark<Program<'a, Self::InputType>>;
 }
 
 impl<'a, InputType> BenchmarkMetric<'a> for BasicLGP<'a, InputType>
@@ -194,13 +191,15 @@ where
 {
     type InputType = InputType;
 
-    fn get_benchmark_individuals(&'a self) -> Benchmark<'a, Self::InputType> {
-        let worst = self.population.first();
-        let median_index = math::round::floor(self.population.len() as f64 / 2 as f64, 1) as usize;
-        let median = self.population.get(median_index);
-        let best = self.population.last();
+    fn get_benchmark_individuals(&'a self) -> Benchmark<Program<'a, Self::InputType>> {
+        // let sorted_pop = self.population.into_sorted_vec().clone();
+        // let Some(Reverse(worst)) = sorted_pop.first();
+        // let median_index = math::round::floor(sorted_pop.len() as f64 / 2 as f64, 1) as usize;
+        // let Some(Reverse(median)) = sorted_pop.get(median_index);
+        // let Some(Reverse(best)) = sorted_pop.last();
 
-        Benchmark::<'a, Self::InputType>(worst.unwrap(), median.unwrap(), best.unwrap())
+        // Benchmark(worst.to_owned(), median.to_owned(), best.to_owned())
+        todo!()
     }
 }
 
@@ -222,6 +221,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     while !ptr::eq(worst, median) && !ptr::eq(median, best) {
         gp.apply_natural_selection().breed();
 
+        // todo: ensure only lower indices are removed
         Benchmark(worst, median, best) = gp.get_benchmark_individuals();
         println!(
             "{:.5} {:.5} {:.5}",

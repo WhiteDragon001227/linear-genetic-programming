@@ -1,10 +1,10 @@
-use crate::containers::Collection;
 use crate::inputs::Inputs;
 use crate::program::Program;
 use crate::registers::RegisterRepresentable;
+use std::collections::VecDeque;
 use std::path::Path;
 
-pub type Population<'a, InputType> = Collection<Program<'a, InputType>>;
+pub type Population<'a, InputType> = VecDeque<Program<'a, InputType>>;
 pub type PopulationSlice<'a, InputType> = &'a [Program<'a, InputType>];
 
 #[derive(Clone, Copy, Debug)]

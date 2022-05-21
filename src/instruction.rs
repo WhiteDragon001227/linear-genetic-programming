@@ -1,5 +1,5 @@
 use crate::containers::CollectionIndexPair;
-use crate::registers::{RegisterRepresentable, RegisterValue, Registers};
+use crate::registers::{RegisterRepresentable, Registers};
 use crate::utils::AnyExecutable;
 use num_derive::FromPrimitive;
 use rand::distributions::uniform::{UniformInt, UniformSampler};
@@ -10,16 +10,6 @@ use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use strum::EnumCount;
-
-impl Debug for Instruction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Instruction")
-            .field("mode", &self.mode)
-            .field("source_index", &self.source_index)
-            .field("target_index", &self.target_index)
-            .finish()
-    }
-}
 
 #[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq)]
 pub enum Modes {
@@ -39,7 +29,7 @@ impl Distribution<Modes> for Standard {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Instruction {
     source_index: usize,
     target_index: usize,
@@ -47,24 +37,46 @@ pub struct Instruction {
     exec: AnyExecutable,
 }
 
+impl Eq for Instruction {}
+
+impl PartialEq for Instruction {
+    fn eq(&self, other: &Self) -> bool {
+        self.source_index == other.source_index
+            && self.target_index == other.target_index
+            && self.mode == other.mode
+            && self.exec as usize == other.exec as usize
+    }
+}
+
+impl Debug for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Instruction")
+            .field("mode", &self.mode)
+            .field("source_index", &self.source_index)
+            .field("target_index", &self.target_index)
+            .finish()
+    }
+}
+
 impl Instruction {
     pub fn apply(
         &self,
-        registers: CollectionIndexPair,
-        data: CollectionIndexPair,
-    ) -> RegisterValue {
-        // let CollectionIndexPair(internal_registers, source_index) = registers;
-        let value = (self.exec)(registers, data);
-        value
+        registers: &mut Registers,
+        source_data: CollectionIndexPair,
+        target_data: CollectionIndexPair,
+    ) -> () {
+        let value = (self.exec)(&source_data, &target_data);
+        let index = source_data.get_index();
+        registers.update(index, value);
     }
 
-    pub fn get_data<'a, T>(
+    pub fn get_data<InputType>(
         &self,
-        registers: &'a Registers,
-        input: &'a T,
+        registers: &Registers,
+        input: &InputType,
     ) -> [CollectionIndexPair; 2]
     where
-        T: RegisterRepresentable + Clone,
+        InputType: RegisterRepresentable + Clone,
     {
         let target_data = match &self.mode {
             Modes::Input => input.clone().into(),

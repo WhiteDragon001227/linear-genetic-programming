@@ -15,7 +15,7 @@ num-derive = "0.3.3"
 num-traits = "0.2.15"
 rand = "0.8.5"
 log = "0.4.17"
-ordered-float = "3.0"
+ordered-float = {version = "3.0", features=["serde", "rand"]}
 strum = {version = "0.24", features=["derive"]}
 strum_macros = "0.24"
 libmath = "0.2.1"
