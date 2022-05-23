@@ -1,14 +1,17 @@
 {
   "configurations": [
-  {
-    "type": "lldb",
-    "request": "launch",
-    "name": "Launch",
-    "program": "${workspaceFolder}/target/debug/lgp",
-    "args": [],
-    "cwd": "${workspaceFolder}"
-  },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Cargo test",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run"
+        ]
+      },
+      "cwd": "${workspaceFolder}",
+      "args": []
+    },
   ]
-
-
 }

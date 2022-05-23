@@ -9,6 +9,8 @@ use lgp::{
     program::Program,
     registers::RegisterRepresentable,
 };
+#[cfg(test)]
+use pretty_assertions::assert_eq;
 use rand::seq::IteratorRandom;
 use tempfile::NamedTempFile;
 
@@ -101,7 +103,7 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
         inputs: &'a Inputs<Self::InputType>,
     ) -> Self {
         let population: Population<'a, Self::InputType> =
-            VecDeque::with_capacity(hyper_params.population_size);
+            Population::new(hyper_params.population_size);
 
         BasicLGP {
             population,
@@ -113,14 +115,14 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
     fn init_population(&mut self) -> &mut Self {
         for _ in 0..self.hyper_params.population_size {
             let program = Program::generate(&self.inputs, self.hyper_params.instruction_size);
-            self.population.push_front(program)
+            VecDeque::push_front(self.population.get_mut_pop(), program)
         }
 
         self
     }
 
     fn eval_population(&mut self) -> &mut Self {
-        for individual in &mut self.population {
+        for individual in self.population.get_mut_pop() {
             let fitness = individual.eval_fitness();
             individual.fitness = Some(fitness);
         }
@@ -137,10 +139,10 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
 
         let lowest_index = ((1f32 - retention_rate) * (pop_len as f32)).floor() as i32 as usize;
 
-        self.population.make_contiguous().sort();
+        self.population.sort();
 
-        for _ in 0..=lowest_index {
-            self.population.pop_front();
+        for _ in 0..lowest_index {
+            self.population.f_pop();
         }
 
         self
@@ -148,15 +150,18 @@ impl<'a> GeneticAlgorithm<'a> for BasicLGP<'a, IrisInput> {
 
     fn breed(&mut self) -> &mut Self {
         let Self { population, .. } = self;
-        let remaining_size = population.capacity() - population.len();
+        let pop_cap = population.capacity();
+        let pop_len = population.len();
+        let remaining_size = pop_cap - pop_len;
 
         let selected_individuals: Vec<Program<'a, Self::InputType>> = population
+            .get_pop()
             .iter()
             .cloned()
             .choose_multiple(&mut rand::thread_rng(), remaining_size);
 
         for individual in selected_individuals {
-            population.push_back(individual)
+            population.push(individual)
         }
 
         self
@@ -192,14 +197,13 @@ where
     type InputType = InputType;
 
     fn get_benchmark_individuals(&'a self) -> Benchmark<Program<'a, Self::InputType>> {
-        // let sorted_pop = self.population.into_sorted_vec().clone();
-        // let Some(Reverse(worst)) = sorted_pop.first();
-        // let median_index = math::round::floor(sorted_pop.len() as f64 / 2 as f64, 1) as usize;
-        // let Some(Reverse(median)) = sorted_pop.get(median_index);
-        // let Some(Reverse(best)) = sorted_pop.last();
+        let pop = &self.population;
+        let worst = pop.get(0);
+        let median_index = math::round::floor(pop.len() as f64 / 2 as f64, 1) as usize;
+        let median = pop.get(median_index);
+        let best = pop.get(pop.len() - 1);
 
-        // Benchmark(worst.to_owned(), median.to_owned(), best.to_owned())
-        todo!()
+        Benchmark(worst.unwrap(), median.unwrap(), best.unwrap())
     }
 }
 
@@ -238,7 +242,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 mod tests {
     use std::error;
 
-    use rand::Rng;
+    use more_asserts::{assert_le, assert_lt};
 
     use super::*;
 
@@ -253,19 +257,15 @@ mod tests {
             retention_rate: 0.5,
         };
         let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
-        gp.init_population();
-
-        // Drop half approximately.
-        gp.population
-            .retain(|_| rand::thread_rng().gen_bool(hyper_params.retention_rate as f64));
+        gp.init_population().apply_natural_selection();
 
         let dropped_pop_len = gp.population.len();
 
-        assert!(dropped_pop_len < hyper_params.population_size);
+        assert_lt!(dropped_pop_len, hyper_params.population_size);
 
         gp.breed();
 
-        assert!(gp.population.len() == hyper_params.population_size);
+        self::assert_eq!(gp.population.len(), hyper_params.population_size);
 
         Ok(())
     }
@@ -283,10 +283,10 @@ mod tests {
         let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
         gp.init_population().apply_natural_selection();
 
-        assert!(
-            gp.population.len()
-                == ((hyper_params.population_size as f32 * (1f32 - hyper_params.retention_rate))
-                    .floor() as i32 as usize)
+        self::assert_eq!(
+            gp.population.len(),
+            ((hyper_params.population_size as f32 * (1f32 - hyper_params.retention_rate)).floor()
+                as i32 as usize)
         );
 
         Ok(())
@@ -306,10 +306,10 @@ mod tests {
         let mut gp = <BasicLGP<IrisInput> as GeneticAlgorithm>::new(hyper_params, &inputs);
         gp.init_population();
 
-        assert!(gp.population.len() == hyper_params.population_size);
+        self::assert_eq!(gp.population.len(), hyper_params.population_size);
 
-        for individual in gp.population {
-            assert!(individual.instructions.len() <= hyper_params.instruction_size)
+        for individual in gp.population.get_pop() {
+            assert_le!(individual.instructions.len(), hyper_params.instruction_size)
         }
 
         Ok(())
