@@ -60,9 +60,20 @@ where
 #[derive(Clone, Copy, Debug)]
 pub struct HyperParameters {
     pub population_size: usize,
-    pub instruction_size: usize,
+    pub program_size: usize,
     pub retention_rate: f32,
 }
+
+impl HyperParameters {
+    pub fn new(pop_size: usize, program_size: usize, retention_rate: f32) -> Self {
+        HyperParameters {
+            population_size: pop_size,
+            program_size,
+            retention_rate,
+        }
+    }
+}
+
 pub struct LinearGeneticProgramming<'a, InputType>
 where
     InputType: RegisterRepresentable,
