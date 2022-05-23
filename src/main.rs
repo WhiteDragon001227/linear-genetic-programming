@@ -222,7 +222,9 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     gp.init_population().eval_population();
     let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
 
+    let mut i = 0;
     while !ptr::eq(worst, median) && !ptr::eq(median, best) {
+        println!("Iteration: {}", i);
         gp.apply_natural_selection().breed();
 
         // todo: ensure only lower indices are removed
@@ -232,7 +234,8 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
             worst.fitness.unwrap(),
             median.fitness.unwrap(),
             best.fitness.unwrap()
-        )
+        );
+        i += 1;
     }
 
     Ok(())

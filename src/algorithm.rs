@@ -10,13 +10,6 @@ pub struct Population<'a, InputType>(InnerPopulation<'a, InputType>, usize)
 where
     InputType: RegisterRepresentable;
 
-// impl<'a, InputType> Iterator for Population<'a, InputType> where InputType: RegisterRepresentable {
-//     type Item = Program<'a, InputType>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//     }
-// }
-
 impl<'a, InputType> Population<'a, InputType>
 where
     InputType: RegisterRepresentable,
