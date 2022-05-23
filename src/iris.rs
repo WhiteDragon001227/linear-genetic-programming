@@ -55,8 +55,9 @@ mod iris_tests {
         let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
 
         let mut i = 0;
+        println!("START");
         // TODO: Remove `iteration` condition.
-        while (!ptr::eq(worst, median) && !ptr::eq(median, best)) || i > 1000 {
+        while (worst.fitness != best.fitness || median.fitness != best.fitness) || i > 5000 {
             println!("Iteration: {}", i);
             gp.apply_natural_selection().breed();
 
