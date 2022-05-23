@@ -38,3 +38,17 @@ impl Metric for Accuracy {
         OrderedFloat(*n_correct as f32) / OrderedFloat(*total as f32)
     }
 }
+
+pub struct Benchmark<'a, P>(pub &'a P, pub &'a P, pub &'a P);
+
+impl<'a, InputType> Benchmark<'a, InputType> {
+    pub fn new(worst: &'a InputType, median: &'a InputType, best: &'a InputType) -> Self {
+        Benchmark(worst, median, best)
+    }
+}
+
+pub trait BenchmarkMetric<'a> {
+    type InputType;
+
+    fn get_benchmark_individuals(&'a self) -> Benchmark<Self::InputType>;
+}

@@ -1,4 +1,5 @@
 use crate::inputs::Inputs;
+use crate::metrics::{Benchmark, BenchmarkMetric};
 use crate::program::Program;
 use crate::registers::RegisterRepresentable;
 use std::collections::VecDeque;
@@ -62,6 +63,14 @@ pub struct HyperParameters {
     pub instruction_size: usize,
     pub retention_rate: f32,
 }
+pub struct LinearGeneticProgramming<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    pub population: Population<'a, InputType>,
+    pub inputs: &'a Inputs<InputType>,
+    pub hyper_params: HyperParameters,
+}
 
 pub trait GeneticAlgorithm<'a>
 where
@@ -80,4 +89,21 @@ where
     fn apply_natural_selection(&mut self) -> &mut Self;
 
     fn breed(&mut self) -> &mut Self;
+}
+
+impl<'a, InputType> BenchmarkMetric<'a> for LinearGeneticProgramming<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    type InputType = Program<'a, InputType>;
+
+    fn get_benchmark_individuals(&'a self) -> Benchmark<Self::InputType> {
+        let pop = &self.population;
+        let worst = pop.get(0);
+        let median_index = math::round::floor(pop.len() as f64 / 2 as f64, 1) as usize;
+        let median = pop.get(median_index);
+        let best = pop.get(pop.len() - 1);
+
+        Benchmark::new(worst.unwrap(), median.unwrap(), best.unwrap())
+    }
 }
