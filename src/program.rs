@@ -5,7 +5,7 @@ use crate::{
     registers::{RegisterRepresentable, Registers},
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Try)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program<'a, InputType>
 where
     InputType: RegisterRepresentable,
