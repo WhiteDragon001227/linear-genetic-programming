@@ -17,7 +17,7 @@ fn main() {
     gp.init_population().eval_population();
 
     for _ in 0..hyper_params.max_generations {
-        gp.apply_natural_selection().breed();
+        gp.apply_selection().breed();
     }
 
     println!(

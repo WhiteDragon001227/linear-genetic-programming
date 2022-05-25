@@ -3,7 +3,7 @@ use crate::metrics::{Benchmark, BenchmarkMetric};
 use crate::program::Program;
 use crate::registers::RegisterRepresentable;
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 type InnerPopulation<'a, InputType> = VecDeque<Program<'a, InputType>>;
 #[derive(Debug, Clone)]
@@ -101,7 +101,7 @@ where
 
     fn eval_population(&mut self) -> &mut Self;
 
-    fn apply_natural_selection(&mut self) -> &mut Self;
+    fn apply_selection(&mut self) -> &mut Self;
 
     fn breed(&mut self) -> &mut Self;
 }
@@ -114,10 +114,10 @@ where
 
     fn get_benchmark_individuals(&'a self) -> Benchmark<Self::InputType> {
         let pop = &self.population;
-        let worst = pop.get(0);
-        let median_index = math::round::floor(pop.len() as f64 / 2 as f64, 1) as usize;
-        let median = pop.get(median_index);
-        let best = pop.get(pop.len() - 1);
+
+        let worst = pop.first();
+        let median = pop.median();
+        let best = pop.last();
 
         Benchmark::new(worst.unwrap(), median.unwrap(), best.unwrap())
     }

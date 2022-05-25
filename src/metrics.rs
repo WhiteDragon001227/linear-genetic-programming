@@ -11,15 +11,15 @@ pub trait Metric {
 }
 
 // n_correct, total
-pub struct Accuracy(usize, usize);
+pub struct MacroAccuracy(usize, usize);
 
-impl Accuracy {
+impl MacroAccuracy {
     pub fn new(initial_correct: usize, total_counted: usize) -> Self {
-        Accuracy(initial_correct, total_counted)
+        MacroAccuracy(initial_correct, total_counted)
     }
 }
 
-impl Metric for Accuracy {
+impl Metric for MacroAccuracy {
     type ObservableType = bool;
     type ResultType = FitnessScore;
 
@@ -34,16 +34,24 @@ impl Metric for Accuracy {
     }
 
     fn calculate(&self) -> Self::ResultType {
-        let Accuracy(n_correct, total) = self;
+        let MacroAccuracy(n_correct, total) = self;
         OrderedFloat(*n_correct as f32) / OrderedFloat(*total as f32)
     }
 }
 
-pub struct Benchmark<'a, P>(pub &'a P, pub &'a P, pub &'a P);
+pub struct Benchmark<'a, P> {
+    pub worst: &'a P,
+    pub median: &'a P,
+    pub best: &'a P,
+}
 
 impl<'a, InputType> Benchmark<'a, InputType> {
     pub fn new(worst: &'a InputType, median: &'a InputType, best: &'a InputType) -> Self {
-        Benchmark(worst, median, best)
+        Benchmark {
+            worst,
+            median,
+            best,
+        }
     }
 }
 

@@ -4,9 +4,9 @@ A framework for implementing algorithms involving Linear Genetic Programming.
 
 ## Modules
 
-- [Metrics]("./src/metrics.rs")
-- [Iris]("./src/iris.rs")
-- [Algorithm]("./src/algorithm.rs")
+-   [Metrics]("./src/metrics.rs")
+-   [Iris]("./src/iris.rs")
+-   [Algorithm]("./src/algorithm.rs")
 
 ## Examples
 
@@ -27,7 +27,7 @@ A framework for implementing algorithms involving Linear Genetic Programming.
     gp.init_population().eval_population();
 
     for _ in 0..hyper_params.max_generations {
-        gp.apply_natural_selection().breed();
+        gp.apply_selection().breed();
     }
 
     println!(

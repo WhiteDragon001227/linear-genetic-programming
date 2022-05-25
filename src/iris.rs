@@ -63,7 +63,11 @@ mod iris_tests {
 
         gp.init_population().eval_population();
 
-        let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
+        let Benchmark {
+            mut worst,
+            mut median,
+            mut best,
+        } = gp.get_benchmark_individuals();
 
         let mut generations = 0;
 
@@ -84,9 +88,13 @@ mod iris_tests {
         // TODO: Remove `iteration` condition.
         while worst.fitness != best.fitness || median.fitness != best.fitness {
             println!("Iteration: {}", generations + 1);
-            gp.apply_natural_selection().breed().eval_population();
+            gp.apply_selection().breed().eval_population();
 
-            Benchmark(worst, median, best) = gp.get_benchmark_individuals();
+            Benchmark {
+                worst,
+                median,
+                best,
+            } = gp.get_benchmark_individuals();
 
             best_fitness.push(best.fitness.unwrap());
             median_fitness.push(median.fitness.unwrap());
@@ -181,7 +189,7 @@ mod iris_tests {
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
-        gp.init_population().apply_natural_selection();
+        gp.init_population().apply_selection();
 
         let dropped_pop_len = gp.population.len();
 
@@ -210,7 +218,7 @@ mod iris_tests {
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
-        gp.init_population().apply_natural_selection();
+        gp.init_population().apply_selection();
 
         self::assert_eq!(
             gp.population.len(),
@@ -303,7 +311,7 @@ mod iris_impl {
         fitness::{Fitness, FitnessScore},
         inputs::Inputs,
         instruction::Instruction,
-        metrics::{Accuracy, Metric},
+        metrics::{MacroAccuracy, Metric},
         program::Program,
         registers::{RegisterRepresentable, Registers},
     };
@@ -363,7 +371,7 @@ mod iris_impl {
             self
         }
 
-        fn apply_natural_selection(&mut self) -> &mut Self {
+        fn apply_selection(&mut self) -> &mut Self {
             let HyperParameters { gap, .. } = self.hyper_params;
 
             assert!(gap >= 0f32 && gap <= 1f32);
@@ -432,7 +440,7 @@ mod iris_impl {
         fn eval_fitness(&self) -> FitnessScore {
             let inputs = self.inputs;
 
-            let mut fitness = Accuracy::new(0, 0);
+            let mut fitness = MacroAccuracy::new(0, 0);
 
             for input in inputs {
                 let mut registers = self.registers.clone();
@@ -446,7 +454,7 @@ mod iris_impl {
                 let correct_index = input.class as usize;
                 let registers_argmax = registers.argmax(IrisClass::COUNT, correct_index);
 
-                <Accuracy as Metric>::observe(
+                <MacroAccuracy as Metric>::observe(
                     &mut fitness,
                     Some(correct_index) == registers_argmax,
                 );
