@@ -36,6 +36,19 @@ where
         self.0.make_contiguous().sort();
     }
 
+    pub fn first(&self) -> Option<&Program<'a, InputType>> {
+        self.0.get(0)
+    }
+
+    pub fn last(&self) -> Option<&Program<'a, InputType>> {
+        self.0.get(self.0.len() - 1)
+    }
+
+    pub fn median(&self) -> Option<&Program<'a, InputType>> {
+        self.0
+            .get(math::round::floor(self.0.len() as f64 / 2f64, 1) as usize)
+    }
+
     pub fn f_push(&mut self, value: Program<'a, InputType>) -> () {
         self.0.push_front(value)
     }

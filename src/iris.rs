@@ -1,4 +1,4 @@
-pub mod iris_ops {
+mod iris_ops {
     use ordered_float::OrderedFloat;
 
     use crate::containers::CollectionIndexPair;
@@ -27,7 +27,7 @@ pub mod iris_ops {
 
 #[cfg(test)]
 mod iris_tests {
-    use std::{error, fmt::Error};
+    use std::error;
 
     use crate::{
         algorithm::{GeneticAlgorithm, HyperParameters, LinearGeneticProgramming},
@@ -59,19 +59,27 @@ mod iris_tests {
 
         let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
 
+        const EXPECTED_GENERATIONS: u32 = 10;
         let mut generations = 0;
 
         let mut best_fitness: Vec<RegisterValue> = vec![best.fitness.unwrap()];
         let mut median_fitness: Vec<RegisterValue> = vec![median.fitness.unwrap()];
         let mut worst_fitness: Vec<RegisterValue> = vec![worst.fitness.unwrap()];
 
+        println!(
+            "{:.5} {:.5} {:.5}",
+            worst.fitness.unwrap(),
+            median.fitness.unwrap(),
+            best.fitness.unwrap()
+        );
+
         const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
 
         println!("START");
         // TODO: Remove `iteration` condition.
         while worst.fitness != best.fitness || median.fitness != best.fitness {
-            println!("Iteration: {}", generations);
-            gp.apply_natural_selection().breed();
+            println!("Iteration: {}", generations + 1);
+            gp.apply_natural_selection().breed().eval_population();
 
             Benchmark(worst, median, best) = gp.get_benchmark_individuals();
 
@@ -88,7 +96,7 @@ mod iris_tests {
 
             generations += 1;
 
-            if generations > 1000 {
+            if generations > EXPECTED_GENERATIONS {
                 // TODO: Create concrete error type; SNAFU or Failure?
                 Err("Generations exceeded expect convergence time.")?;
             }
@@ -101,14 +109,14 @@ mod iris_tests {
             .margin(5u32)
             .x_label_area_size(30u32)
             .y_label_area_size(30u32)
-            .build_cartesian_2d(0u32..generations, 0f32..1f32)?;
+            .build_cartesian_2d(0..best_fitness.len(), 0f32..1f32)?;
 
         chart.configure_mesh().draw()?;
 
         chart
             .draw_series(LineSeries::new(
                 (0..best_fitness.len())
-                    .map(|x_i| (x_i as u32, best_fitness.get(x_i).unwrap().into_inner())),
+                    .map(|x_i| (x_i, best_fitness.get(x_i).unwrap().into_inner())),
                 &RED,
             ))?
             .label("Best")
@@ -117,7 +125,7 @@ mod iris_tests {
         chart
             .draw_series(LineSeries::new(
                 (0..median_fitness.len())
-                    .map(|x_i| (x_i as u32, median_fitness.get(x_i).unwrap().into_inner())),
+                    .map(|x_i| (x_i, median_fitness.get(x_i).unwrap().into_inner())),
                 &GREEN,
             ))?
             .label("Median")
@@ -126,7 +134,7 @@ mod iris_tests {
         chart
             .draw_series(LineSeries::new(
                 (0..worst_fitness.len())
-                    .map(|x_i| (x_i as u32, worst_fitness.get(x_i).unwrap().into_inner())),
+                    .map(|x_i| (x_i, worst_fitness.get(x_i).unwrap().into_inner())),
                 &BLUE,
             ))?
             .label("Worst")
@@ -259,6 +267,8 @@ mod iris_impl {
     use std::{collections::VecDeque, path::Path};
 
     use csv::ReaderBuilder;
+
+    use more_asserts::assert_le;
     use rand::{
         distributions::uniform::{UniformInt, UniformSampler},
         prelude::IteratorRandom,
@@ -322,9 +332,13 @@ mod iris_impl {
 
         fn eval_population(&mut self) -> &mut Self {
             for individual in self.population.get_mut_pop() {
-                let fitness = individual.eval_fitness();
-                individual.fitness = Some(fitness);
+                individual.fitness = match individual.fitness {
+                    None => Some(individual.eval_fitness()),
+                    Some(fitness) => Some(fitness),
+                }
             }
+
+            self.population.sort();
 
             self
         }
@@ -334,11 +348,14 @@ mod iris_impl {
 
             assert!(retention_rate >= 0f32 && retention_rate <= 1f32);
 
+            assert_le!(
+                self.population.first().unwrap().fitness,
+                self.population.last().unwrap().fitness
+            );
+
             let pop_len = self.population.len();
 
             let lowest_index = ((1f32 - retention_rate) * (pop_len as f32)).floor() as i32 as usize;
-
-            self.population.sort();
 
             for _ in 0..lowest_index {
                 self.population.f_pop();
