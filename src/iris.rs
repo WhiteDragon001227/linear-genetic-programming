@@ -51,7 +51,13 @@ mod iris_tests {
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
 
-        let hyper_params = HyperParameters::new(100, 100, 0.5);
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            max_program_size: 100,
+            gap: 0.5,
+            max_generations: 100,
+        };
+
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
@@ -59,7 +65,6 @@ mod iris_tests {
 
         let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
 
-        const EXPECTED_GENERATIONS: u32 = 10;
         let mut generations = 0;
 
         let mut best_fitness: Vec<RegisterValue> = vec![best.fitness.unwrap()];
@@ -96,7 +101,7 @@ mod iris_tests {
 
             generations += 1;
 
-            if generations > EXPECTED_GENERATIONS {
+            if generations > hyper_params.max_generations {
                 // TODO: Create concrete error type; SNAFU or Failure?
                 Err("Generations exceeded expect convergence time.")?;
             }
@@ -167,7 +172,12 @@ mod iris_tests {
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters::new(100, 100, 0.5);
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            max_program_size: 100,
+            gap: 0.5,
+            max_generations: 100,
+        };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
@@ -191,7 +201,12 @@ mod iris_tests {
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters::new(100, 100, 0.5);
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            max_program_size: 100,
+            gap: 0.5,
+            max_generations: 100,
+        };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
@@ -213,7 +228,12 @@ mod iris_tests {
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters::new(100, 100, 0.5);
+        let hyper_params = HyperParameters {
+            population_size: 100,
+            max_program_size: 100,
+            gap: 0.5,
+            max_generations: 100,
+        };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
@@ -264,7 +284,7 @@ mod iris_tests {
 }
 
 mod iris_impl {
-    use std::{collections::VecDeque, path::Path};
+    use std::{collections::VecDeque, path::PathBuf};
 
     use csv::ReaderBuilder;
 
@@ -293,10 +313,10 @@ mod iris_impl {
     impl<'a> GeneticAlgorithm<'a> for IrisLinearGeneticProgramming<'a> {
         type InputType = IrisInput;
 
-        fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType> {
+        fn load_inputs(file_path: impl Into<PathBuf>) -> Inputs<Self::InputType> {
             let mut csv_reader = ReaderBuilder::new()
                 .has_headers(false)
-                .from_path(file_path)
+                .from_path(file_path.into())
                 .unwrap();
 
             let raw_inputs: Vec<IrisInput> = csv_reader
@@ -323,7 +343,7 @@ mod iris_impl {
 
         fn init_population(&mut self) -> &mut Self {
             for _ in 0..self.hyper_params.population_size {
-                let program = Program::generate(&self.inputs, self.hyper_params.program_size);
+                let program = Program::generate(&self.inputs, self.hyper_params.max_program_size);
                 VecDeque::push_front(self.population.get_mut_pop(), program)
             }
 
@@ -344,9 +364,9 @@ mod iris_impl {
         }
 
         fn apply_natural_selection(&mut self) -> &mut Self {
-            let HyperParameters { retention_rate, .. } = self.hyper_params;
+            let HyperParameters { gap, .. } = self.hyper_params;
 
-            assert!(retention_rate >= 0f32 && retention_rate <= 1f32);
+            assert!(gap >= 0f32 && gap <= 1f32);
 
             assert_le!(
                 self.population.first().unwrap().fitness,
@@ -355,7 +375,7 @@ mod iris_impl {
 
             let pop_len = self.population.len();
 
-            let lowest_index = ((1f32 - retention_rate) * (pop_len as f32)).floor() as i32 as usize;
+            let lowest_index = ((1f32 - gap) * (pop_len as f32)).floor() as i32 as usize;
 
             for _ in 0..lowest_index {
                 self.population.f_pop();

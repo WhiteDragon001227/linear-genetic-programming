@@ -3,7 +3,7 @@ use crate::metrics::{Benchmark, BenchmarkMetric};
 use crate::program::Program;
 use crate::registers::RegisterRepresentable;
 use std::collections::VecDeque;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 type InnerPopulation<'a, InputType> = VecDeque<Program<'a, InputType>>;
 #[derive(Debug, Clone)]
@@ -73,18 +73,9 @@ where
 #[derive(Clone, Copy, Debug)]
 pub struct HyperParameters {
     pub population_size: usize,
-    pub program_size: usize,
-    pub retention_rate: f32,
-}
-
-impl HyperParameters {
-    pub fn new(pop_size: usize, program_size: usize, retention_rate: f32) -> Self {
-        HyperParameters {
-            population_size: pop_size,
-            program_size,
-            retention_rate,
-        }
-    }
+    pub max_program_size: usize,
+    pub gap: f32,
+    pub max_generations: usize,
 }
 
 pub struct LinearGeneticProgramming<'a, InputType>
@@ -102,7 +93,7 @@ where
 {
     type InputType;
 
-    fn load_inputs(file_path: &'a Path) -> Inputs<Self::InputType>;
+    fn load_inputs(file_path: impl Into<PathBuf>) -> Inputs<Self::InputType>;
 
     fn new(hyper_params: HyperParameters, inputs: &'a Inputs<Self::InputType>) -> Self;
 
