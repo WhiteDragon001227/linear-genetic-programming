@@ -43,12 +43,15 @@ mod iris_tests {
         style::{Color, IntoFont, BLACK, BLUE, GREEN, RED, WHITE},
     };
     use pretty_assertions::{assert_eq, assert_ne};
+    use serde::de::IntoDeserializer;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
     #[tokio::test]
     async fn given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness(
     ) -> Result<(), Box<dyn error::Error>> {
+        IrisLinearGeneticProgramming::env_init();
+
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
 
         let hyper_params = HyperParameters {
@@ -63,49 +66,20 @@ mod iris_tests {
 
         gp.init_population().eval_population();
 
-        let Benchmark {
-            mut worst,
-            mut median,
-            mut best,
-        } = gp.get_benchmark_individuals();
+        let mut benchmark = gp.get_benchmark_individuals();
+
+        let benchmarks = vec![benchmark];
 
         let mut generations = 0;
 
-        let mut best_fitness: Vec<RegisterValue> = vec![best.fitness.unwrap()];
-        let mut median_fitness: Vec<RegisterValue> = vec![median.fitness.unwrap()];
-        let mut worst_fitness: Vec<RegisterValue> = vec![worst.fitness.unwrap()];
-
-        println!(
-            "{:.5} {:.5} {:.5}",
-            worst.fitness.unwrap(),
-            median.fitness.unwrap(),
-            best.fitness.unwrap()
-        );
-
         const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
 
-        println!("START");
-        // TODO: Remove `iteration` condition.
-        while worst.fitness != best.fitness || median.fitness != best.fitness {
-            println!("Iteration: {}", generations + 1);
+        while benchmark.worst.fitness.unwrap() != benchmark.median.fitness.unwrap()
+            || benchmark.median.fitness.unwrap() != benchmark.best.fitness.unwrap()
+        {
             gp.apply_selection().breed().eval_population();
 
-            Benchmark {
-                worst,
-                median,
-                best,
-            } = gp.get_benchmark_individuals();
-
-            best_fitness.push(best.fitness.unwrap());
-            median_fitness.push(median.fitness.unwrap());
-            worst_fitness.push(worst.fitness.unwrap());
-
-            println!(
-                "{:.5} {:.5} {:.5}",
-                worst.fitness.unwrap(),
-                median.fitness.unwrap(),
-                best.fitness.unwrap()
-            );
+            benchmark = gp.get_benchmark_individuals();
 
             generations += 1;
 
@@ -122,14 +96,24 @@ mod iris_tests {
             .margin(5u32)
             .x_label_area_size(30u32)
             .y_label_area_size(30u32)
-            .build_cartesian_2d(0..best_fitness.len(), 0f32..1f32)?;
+            .build_cartesian_2d(0..benchmarks.len(), 0f32..1f32)?;
 
         chart.configure_mesh().draw()?;
 
         chart
             .draw_series(LineSeries::new(
-                (0..best_fitness.len())
-                    .map(|x_i| (x_i, best_fitness.get(x_i).unwrap().into_inner())),
+                (0..benchmarks.len()).map(|x_i| {
+                    (
+                        x_i,
+                        benchmarks
+                            .get(x_i)
+                            .unwrap()
+                            .best
+                            .fitness
+                            .unwrap()
+                            .into_inner(),
+                    )
+                }),
                 &RED,
             ))?
             .label("Best")
@@ -137,8 +121,18 @@ mod iris_tests {
 
         chart
             .draw_series(LineSeries::new(
-                (0..median_fitness.len())
-                    .map(|x_i| (x_i, median_fitness.get(x_i).unwrap().into_inner())),
+                (0..benchmarks.len()).map(|x_i| {
+                    (
+                        x_i,
+                        benchmarks
+                            .get(x_i)
+                            .unwrap()
+                            .median
+                            .fitness
+                            .unwrap()
+                            .into_inner(),
+                    )
+                }),
                 &GREEN,
             ))?
             .label("Median")
@@ -146,8 +140,18 @@ mod iris_tests {
 
         chart
             .draw_series(LineSeries::new(
-                (0..worst_fitness.len())
-                    .map(|x_i| (x_i, worst_fitness.get(x_i).unwrap().into_inner())),
+                (0..benchmarks.len()).map(|x_i| {
+                    (
+                        x_i,
+                        benchmarks
+                            .get(x_i)
+                            .unwrap()
+                            .worst
+                            .fitness
+                            .unwrap()
+                            .into_inner(),
+                    )
+                }),
                 &BLUE,
             ))?
             .label("Worst")

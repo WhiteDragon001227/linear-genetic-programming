@@ -93,6 +93,10 @@ where
 {
     type InputType;
 
+    fn env_init() -> () {
+        pretty_env_logger::init();
+    }
+
     fn load_inputs(file_path: impl Into<PathBuf>) -> Inputs<Self::InputType>;
 
     fn new(hyper_params: HyperParameters, inputs: &'a Inputs<Self::InputType>) -> Self;

@@ -14,6 +14,8 @@ A framework for implementing algorithms involving Linear Genetic Programming.
 
 ```rust
   fn main() {
+    IrisLinearGeneticProgramming::env_init();
+
     let hyper_params = HyperParameters {
         population_size: 1000,
         max_program_size: 100,

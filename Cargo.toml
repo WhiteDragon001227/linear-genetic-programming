@@ -21,6 +21,7 @@ strum_macros = "0.24"
 libmath = "0.2.1"
 pretty_env_logger = "0.4"
 more-asserts = { version = "0.2" }
+tabled = "0.7"
 
 [dev-dependencies]
 pretty_assertions = { version= "1.2"}
