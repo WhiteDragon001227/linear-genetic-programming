@@ -27,16 +27,21 @@ pub mod iris_ops {
 
 #[cfg(test)]
 mod iris_tests {
-    use std::{error, ptr};
+    use std::{error, fmt::Error};
 
     use crate::{
         algorithm::{GeneticAlgorithm, HyperParameters, LinearGeneticProgramming},
         iris::iris_data::IrisInput,
         metrics::{Benchmark, BenchmarkMetric},
+        registers::RegisterValue,
     };
 
     use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
     use more_asserts::{assert_le, assert_lt};
+    use plotters::{
+        prelude::{BitMapBackend, ChartBuilder, IntoDrawingArea, LineSeries, PathElement},
+        style::{Color, IntoFont, BLACK, BLUE, GREEN, RED, WHITE},
+    };
     use pretty_assertions::{assert_eq, assert_ne};
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -54,23 +59,84 @@ mod iris_tests {
 
         let Benchmark(mut worst, mut median, mut best) = gp.get_benchmark_individuals();
 
-        let mut i = 0;
+        let mut generations = 0;
+
+        let mut best_fitness: Vec<RegisterValue> = vec![best.fitness.unwrap()];
+        let mut median_fitness: Vec<RegisterValue> = vec![median.fitness.unwrap()];
+        let mut worst_fitness: Vec<RegisterValue> = vec![worst.fitness.unwrap()];
+
+        const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
+
         println!("START");
         // TODO: Remove `iteration` condition.
-        while (worst.fitness != best.fitness || median.fitness != best.fitness) || i > 5000 {
-            println!("Iteration: {}", i);
+        while worst.fitness != best.fitness || median.fitness != best.fitness {
+            println!("Iteration: {}", generations);
             gp.apply_natural_selection().breed();
 
-            // todo: ensure only lower indices are removed
             Benchmark(worst, median, best) = gp.get_benchmark_individuals();
+
+            best_fitness.push(best.fitness.unwrap());
+            median_fitness.push(median.fitness.unwrap());
+            worst_fitness.push(worst.fitness.unwrap());
+
             println!(
                 "{:.5} {:.5} {:.5}",
                 worst.fitness.unwrap(),
                 median.fitness.unwrap(),
                 best.fitness.unwrap()
             );
-            i += 1;
+
+            generations += 1;
+
+            if generations > 1000 {
+                // TODO: Create concrete error type; SNAFU or Failure?
+                Err("Generations exceeded expect convergence time.")?;
+            }
         }
+
+        let root = BitMapBackend::new(PLOT_FILE_NAME, (1280, 720)).into_drawing_area();
+        root.fill(&WHITE)?;
+        let mut chart = ChartBuilder::on(&root)
+            .caption("Fitness Over Generations", ("sans-serif", 50).into_font())
+            .margin(5u32)
+            .x_label_area_size(30u32)
+            .y_label_area_size(30u32)
+            .build_cartesian_2d(0u32..generations, 0f32..1f32)?;
+
+        chart.configure_mesh().draw()?;
+
+        chart
+            .draw_series(LineSeries::new(
+                (0..best_fitness.len())
+                    .map(|x_i| (x_i as u32, best_fitness.get(x_i).unwrap().into_inner())),
+                &RED,
+            ))?
+            .label("Best")
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+        chart
+            .draw_series(LineSeries::new(
+                (0..median_fitness.len())
+                    .map(|x_i| (x_i as u32, median_fitness.get(x_i).unwrap().into_inner())),
+                &GREEN,
+            ))?
+            .label("Median")
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
+
+        chart
+            .draw_series(LineSeries::new(
+                (0..worst_fitness.len())
+                    .map(|x_i| (x_i as u32, worst_fitness.get(x_i).unwrap().into_inner())),
+                &BLUE,
+            ))?
+            .label("Worst")
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+
+        chart
+            .configure_series_labels()
+            .background_style(&WHITE.mix(0.8))
+            .border_style(&BLACK)
+            .draw()?;
 
         Ok(())
     }
