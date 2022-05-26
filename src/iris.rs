@@ -506,10 +506,12 @@ pub mod iris_data {
         Deserialize,
         Hash,
     )]
-    #[serde(rename_all = "lowercase")]
     pub enum IrisClass {
+        #[serde(rename = "Iris-setosa")]
         Setosa = 0,
+        #[serde(rename = "Iris-versicolor")]
         Versicolour = 1,
+        #[serde(rename = "Iris-virginica")]
         Virginica = 2,
     }
 
