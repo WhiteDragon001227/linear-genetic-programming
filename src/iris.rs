@@ -32,8 +32,6 @@ mod iris_tests {
     use crate::{
         algorithm::{GeneticAlgorithm, HyperParameters, LinearGeneticProgramming},
         iris::iris_data::IrisInput,
-        metrics::{Benchmark, BenchmarkMetric},
-        registers::RegisterValue,
     };
 
     use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
@@ -43,7 +41,6 @@ mod iris_tests {
         style::{Color, IntoFont, BLACK, BLUE, GREEN, RED, WHITE},
     };
     use pretty_assertions::{assert_eq, assert_ne};
-    use serde::de::IntoDeserializer;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -68,7 +65,7 @@ mod iris_tests {
 
         let mut benchmark = gp.get_benchmark_individuals();
 
-        let benchmarks = vec![benchmark];
+        let benchmarks = vec![benchmark.clone()];
 
         let mut generations = 0;
 
@@ -226,8 +223,8 @@ mod iris_tests {
 
         self::assert_eq!(
             gp.population.len(),
-            ((hyper_params.population_size as f32 * (1f32 - hyper_params.retention_rate)).floor()
-                as i32 as usize)
+            ((hyper_params.population_size as f32 * (1f32 - hyper_params.gap)).floor() as i32
+                as usize)
         );
 
         Ok(())
@@ -254,7 +251,7 @@ mod iris_tests {
         self::assert_eq!(gp.population.len(), hyper_params.population_size);
 
         for individual in gp.population.get_pop() {
-            assert_le!(individual.instructions.len(), hyper_params.program_size)
+            assert_le!(individual.instructions.len(), hyper_params.max_program_size)
         }
 
         Ok(())
@@ -312,7 +309,7 @@ mod iris_impl {
         algorithm::{
             self, GeneticAlgorithm, HyperParameters, LinearGeneticProgramming, Population,
         },
-        fitness::{Fitness, FitnessScore},
+        characteristics::{Fitness, FitnessScore},
         inputs::Inputs,
         instruction::Instruction,
         metrics::{MacroAccuracy, Metric},
@@ -444,7 +441,7 @@ mod iris_impl {
         fn eval_fitness(&self) -> FitnessScore {
             let inputs = self.inputs;
 
-            let mut fitness = MacroAccuracy::new(0, 0);
+            let mut fitness = MacroAccuracy::new();
 
             for input in inputs {
                 let mut registers = self.registers.clone();
@@ -475,23 +472,34 @@ mod iris_impl {
 
 pub mod iris_data {
     use core::fmt;
+    use std::fmt::Display;
 
     use ordered_float::OrderedFloat;
-    use serde::{
-        de::{self, Visitor},
-        Deserialize, Deserializer,
-    };
+    use serde::{Deserialize, Serialize};
     use strum::EnumCount;
 
     use crate::{
         algorithm::LinearGeneticProgramming,
-        registers::{RegisterRepresentable, Registers},
+        registers::{Compare, RegisterRepresentable, Registers, Show},
     };
 
     pub const IRIS_DATASET_LINK: &'static str =
         "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
 
-    #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, PartialOrd, Ord)]
+    #[derive(
+        Debug,
+        Clone,
+        Copy,
+        Eq,
+        PartialEq,
+        EnumCount,
+        PartialOrd,
+        Ord,
+        strum::Display,
+        Serialize,
+        Deserialize,
+    )]
+    #[serde(rename_all = "lowercase")]
     pub enum IrisClass {
         Setosa = 0,
         Versicolour = 1,
@@ -500,15 +508,24 @@ pub mod iris_data {
 
     pub type IrisLinearGeneticProgramming<'a> = LinearGeneticProgramming<'a, IrisInput>;
 
-    #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq, Serialize)]
     pub struct IrisInput {
         sepal_length: OrderedFloat<f32>,
         sepal_width: OrderedFloat<f32>,
         petal_length: OrderedFloat<f32>,
         petal_width: OrderedFloat<f32>,
-        #[serde(deserialize_with = "IrisInput::deserialize_iris_class")]
         pub class: IrisClass,
     }
+
+    impl Display for IrisInput {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let serialized = toml::to_string(&self).unwrap();
+            f.write_str(&serialized)
+        }
+    }
+
+    impl Show for IrisInput {}
+    impl Compare for IrisInput {}
 
     impl RegisterRepresentable for IrisInput {
         fn get_number_classes() -> usize {
@@ -528,40 +545,6 @@ pub mod iris_data {
                 self.petal_length,
                 self.petal_width,
             ]);
-        }
-    }
-
-    impl IrisInput {
-        fn deserialize_iris_class<'de, D>(deserializer: D) -> Result<IrisClass, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            const FIELDS: &'static [&'static str] =
-                &["Iris-setosa", "Iris-versicolor", "Iris-virginica"];
-
-            struct IrisClassVisitor;
-
-            impl<'de> Visitor<'de> for IrisClassVisitor {
-                type Value = IrisClass;
-
-                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                    formatter.write_str(&FIELDS.join(" or "))
-                }
-
-                fn visit_str<E>(self, value: &str) -> Result<IrisClass, E>
-                where
-                    E: de::Error,
-                {
-                    match value {
-                        "Iris-setosa" => Ok(IrisClass::Setosa),
-                        "Iris-versicolor" => Ok(IrisClass::Versicolour),
-                        "Iris-virginica" => Ok(IrisClass::Virginica),
-                        _ => Err(de::Error::unknown_field(value, FIELDS)),
-                    }
-                }
-            }
-
-            deserializer.deserialize_str(IrisClassVisitor)
         }
     }
 }

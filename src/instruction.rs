@@ -6,12 +6,13 @@ use rand::distributions::uniform::{UniformInt, UniformSampler};
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{distributions::Standard, prelude::Distribution};
 use rand::{thread_rng, Rng, SeedableRng};
+use serde::Serialize;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use strum::EnumCount;
 
-#[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq)]
+#[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq, Serialize)]
 pub enum Modes {
     Input = 0,
     Registers = 1,
@@ -29,11 +30,12 @@ impl Distribution<Modes> for Standard {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Instruction {
     source_index: usize,
     target_index: usize,
     mode: Modes,
+    #[serde(skip_serializing)]
     exec: AnyExecutable,
 }
 

@@ -1,6 +1,6 @@
 pub mod algorithm;
+pub mod characteristics;
 mod containers;
-pub mod fitness;
 pub mod inputs;
 pub mod instruction;
 pub mod iris;

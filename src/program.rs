@@ -1,11 +1,15 @@
+use std::fmt::Display;
+
+use serde::Serialize;
+
 use crate::{
-    fitness::FitnessScore,
+    characteristics::FitnessScore,
     inputs::Inputs,
     instruction::Instruction,
     registers::{RegisterRepresentable, Registers},
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Program<'a, InputType>
 where
     InputType: RegisterRepresentable,
@@ -14,6 +18,16 @@ where
     pub inputs: &'a Inputs<InputType>,
     pub registers: Registers,
     pub fitness: Option<FitnessScore>,
+}
+
+impl<'a, InputType> Display for Program<'a, InputType>
+where
+    InputType: RegisterRepresentable,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let serialized = toml::to_string(&self).unwrap();
+        f.write_str(&serialized)
+    }
 }
 
 impl<'a, InputType> Ord for Program<'a, InputType>

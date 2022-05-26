@@ -1,5 +1,5 @@
 use crate::inputs::Inputs;
-use crate::metrics::{Benchmark, BenchmarkMetric};
+use crate::metrics::Benchmark;
 use crate::program::Program;
 use crate::registers::RegisterRepresentable;
 use std::collections::VecDeque;
@@ -108,21 +108,4 @@ where
     fn apply_selection(&mut self) -> &mut Self;
 
     fn breed(&mut self) -> &mut Self;
-}
-
-impl<'a, InputType> BenchmarkMetric<'a> for LinearGeneticProgramming<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    type InputType = Program<'a, InputType>;
-
-    fn get_benchmark_individuals(&'a self) -> Benchmark<Self::InputType> {
-        let pop = &self.population;
-
-        let worst = pop.first();
-        let median = pop.median();
-        let best = pop.last();
-
-        Benchmark::new(worst.unwrap(), median.unwrap(), best.unwrap())
-    }
 }

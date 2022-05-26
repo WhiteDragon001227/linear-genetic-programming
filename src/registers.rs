@@ -1,11 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use ordered_float::OrderedFloat;
+use serde::Serialize;
 use std::fmt;
 
 pub type RegisterValue = OrderedFloat<f32>;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Registers(Vec<RegisterValue>);
 
 impl Registers {
@@ -73,9 +77,10 @@ impl Registers {
     }
 }
 
-pub trait RegisterRepresentable:
-    fmt::Debug + Into<Registers> + Clone + PartialEq + Eq + PartialOrd + Ord
-{
+pub trait Compare: PartialEq + Eq + PartialOrd + Ord {}
+pub trait Show: fmt::Debug + Display + Serialize {}
+
+pub trait RegisterRepresentable: Into<Registers> + Clone + Compare + Show {
     fn get_number_classes() -> usize;
     fn get_number_features() -> usize;
 }
