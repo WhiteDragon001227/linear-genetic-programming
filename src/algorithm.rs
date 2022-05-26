@@ -1,5 +1,4 @@
 use crate::inputs::Inputs;
-use crate::metrics::Benchmark;
 use crate::program::Program;
 use crate::registers::RegisterRepresentable;
 use std::collections::VecDeque;
@@ -44,7 +43,7 @@ where
         self.0.get(self.0.len() - 1)
     }
 
-    pub fn median(&self) -> Option<&Program<'a, InputType>> {
+    pub fn middle(&self) -> Option<&Program<'a, InputType>> {
         self.0
             .get(math::round::floor(self.0.len() as f64 / 2f64, 1) as usize)
     }
@@ -93,7 +92,7 @@ where
 {
     type InputType;
 
-    fn env_init() -> () {
+    fn init_env() -> () {
         pretty_env_logger::init();
     }
 

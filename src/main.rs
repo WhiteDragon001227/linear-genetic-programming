@@ -4,7 +4,7 @@ use lgp::{
 };
 
 fn main() {
-    IrisLinearGeneticProgramming::env_init();
+    IrisLinearGeneticProgramming::init_env();
 
     let hyper_params = HyperParameters {
         population_size: 1000,

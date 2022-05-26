@@ -32,10 +32,12 @@ mod iris_tests {
     use crate::{
         algorithm::{GeneticAlgorithm, HyperParameters, LinearGeneticProgramming},
         iris::iris_data::IrisInput,
+        metrics::ComplexityBenchmark,
     };
 
     use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
     use more_asserts::{assert_le, assert_lt};
+    use ordered_float::OrderedFloat;
     use plotters::{
         prelude::{BitMapBackend, ChartBuilder, IntoDrawingArea, LineSeries, PathElement},
         style::{Color, IntoFont, BLACK, BLUE, GREEN, RED, WHITE},
@@ -47,7 +49,7 @@ mod iris_tests {
     #[tokio::test]
     async fn given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness(
     ) -> Result<(), Box<dyn error::Error>> {
-        IrisLinearGeneticProgramming::env_init();
+        IrisLinearGeneticProgramming::init_env();
 
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
 
@@ -63,16 +65,20 @@ mod iris_tests {
 
         gp.init_population().eval_population();
 
-        let mut benchmark = gp.get_benchmark_individuals();
+        let mut benchmark = ComplexityBenchmark {
+            worst: gp.population.first().unwrap().fitness.unwrap(),
+            median: gp.population.middle().unwrap().fitness.unwrap(),
+            best: gp.population.last().unwrap().fitness.unwrap(),
+        };
 
-        let benchmarks = vec![benchmark.clone()];
+        let mut benchmarks: Vec<ComplexityBenchmark<OrderedFloat<f32>>> = vec![benchmark];
 
         let mut generations = 0;
 
         const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
 
-        while benchmark.worst.fitness.unwrap() != benchmark.median.fitness.unwrap()
-            || benchmark.median.fitness.unwrap() != benchmark.best.fitness.unwrap()
+        while benchmark.get_worst() != benchmark.get_median()
+            || benchmark.get_median() != benchmark.get_best()
         {
             gp.apply_selection().breed().eval_population();
 
@@ -312,7 +318,7 @@ mod iris_impl {
         characteristics::{Fitness, FitnessScore},
         inputs::Inputs,
         instruction::Instruction,
-        metrics::{MacroAccuracy, Metric},
+        metrics::{Accuracy, Metric},
         program::Program,
         registers::{RegisterRepresentable, Registers},
     };
@@ -441,7 +447,7 @@ mod iris_impl {
         fn eval_fitness(&self) -> FitnessScore {
             let inputs = self.inputs;
 
-            let mut fitness = MacroAccuracy::new();
+            let mut fitness = Accuracy::new();
 
             for input in inputs {
                 let mut registers = self.registers.clone();
@@ -455,7 +461,7 @@ mod iris_impl {
                 let correct_index = input.class as usize;
                 let registers_argmax = registers.argmax(IrisClass::COUNT, correct_index);
 
-                <MacroAccuracy as Metric>::observe(
+                <Accuracy as Metric>::observe(
                     &mut fitness,
                     Some(correct_index) == registers_argmax,
                 );
