@@ -2,82 +2,106 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
-use crate::characteristics::FitnessScore;
+use crate::utils::Compare;
 
 use super::Metric;
 
+type ComparablePair<K> = [K; 2];
+
 struct RunningCounter(usize, usize);
+
 impl RunningCounter {
-    pub fn increment(&mut self) -> () {
-        &self.0 += 1;
-        &self.1 += 1;
+    pub fn count_correct(&mut self) -> () {
+        self.0 += 1;
+        self.1 += 1;
     }
 
-    pub fn increment_total(&mut self) -> () {
-        &self.1 += 1;
+    pub fn count_wrong(&mut self) -> () {
+        self.1 += 1;
     }
 
     pub fn get_total(&self) -> usize {
         return self.1;
     }
 
-    pub fn get_counts(&self) -> usize {
+    pub fn get_correct(&self) -> usize {
         return self.0;
     }
 }
-struct OccuranceCounter<T, E>(T, RunningCounter, PhantomData<E>);
+struct OccuranceCounter<T>(RunningCounter, PhantomData<T>);
 
-impl<T, E> OccuranceCounter<E> {
-    fn new(expected_value: E) -> Self {
-        OccuranceCounter(expected_value, RunningCounter(0, 0))
+impl<K> OccuranceCounter<K>
+where
+    K: Compare,
+{
+    fn new() -> Self {
+        OccuranceCounter(RunningCounter(0, 0), PhantomData)
     }
 }
 
-impl<T, E> Metric for OccuranceCounter<T, E>
+impl<K> Metric for OccuranceCounter<K>
 where
-    T: PartialEq<E>,
+    K: Compare,
 {
-    type ObservableType = T;
-    type ResultType = RunningCounter;
+    type ObservableType = ComparablePair<K>;
+    type ResultType = [usize; 2];
 
     fn observe(&mut self, value: Self::ObservableType) -> () {
-        let OccuranceCounter(expected_value, mut counter) = self;
-        if value == expected_value {
-            counter.increment()
-        } else {
-            counter.increment_total()
+        let OccuranceCounter(counter, ..) = self;
+
+        match value {
+            [x, y] if x == y => counter.count_correct(),
+            _ => counter.count_wrong(),
         }
     }
 
     fn calculate(&self) -> Self::ResultType {
-        todo!()
+        [self.0.get_correct(), self.0.get_total()]
     }
 }
 
-pub struct Accuracy<T>(HashMap<String, OccuranceCounter<T>>);
+pub struct Accuracy<K>(HashMap<K, OccuranceCounter<K>>)
+where
+    K: Compare;
 
-impl<T> Accuracy<T> {
-    fn new() -> Self {
+impl<K> Accuracy<K>
+where
+    K: Compare,
+{
+    pub fn new() -> Self {
         Accuracy(HashMap::new())
     }
 }
 
-impl<T> Metric for Accuracy<T> {
-    type ObservableType = bool;
-    type ResultType = FitnessScore;
+impl<K> Metric for Accuracy<K>
+where
+    K: Compare,
+{
+    type ObservableType = ComparablePair<K>;
+    type ResultType = OrderedFloat<f64>;
 
     fn observe(&mut self, value: Self::ObservableType) {
-        let count = match value {
-            true => 1,
-            _ => 0,
-        };
+        let Accuracy(map, ..) = self;
+        let [.., expected] = value.clone();
 
-        self.0 += count;
-        self.1 += 1
+        if map.contains_key(&expected) {
+            let counter = map.get_mut(&expected).unwrap();
+            counter.observe(value);
+        } else {
+            let mut counter = OccuranceCounter::new();
+            counter.observe(value.clone());
+            map.insert(expected, counter);
+        }
     }
 
     fn calculate(&self) -> Self::ResultType {
-        let Accuracy(n_correct, total) = self;
-        OrderedFloat(*n_correct as f32) / OrderedFloat(*total as f32)
+        let counter = &self.0.iter().fold([0; 2], |accum, item| {
+            [
+                accum[0] + item.1.calculate()[0],
+                accum[1] + item.1.calculate()[1],
+            ]
+        });
+
+        OrderedFloat(counter[0] as f64) / OrderedFloat(counter[1] as f64)
     }
 }

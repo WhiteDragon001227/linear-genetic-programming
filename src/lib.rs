@@ -1,3 +1,5 @@
+#![feature(trait_alias)]
+
 pub mod algorithm;
 pub mod characteristics;
 mod containers;
@@ -7,5 +9,5 @@ pub mod iris;
 pub mod metrics;
 pub mod program;
 mod registers;
+mod structures;
 mod utils;
-mod median_heap;

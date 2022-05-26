@@ -3,5 +3,5 @@ mod benchmarks;
 mod definitions;
 
 pub use accuracy::Accuracy;
-pub use benchmarks::{ComplexityBenchmark, RunningBenchmark};
+pub use benchmarks::{Benchmark, ComplexityBenchmark, RunningBenchmark};
 pub use definitions::Metric;

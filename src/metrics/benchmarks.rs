@@ -1,4 +1,4 @@
-use crate::{median_heap::MedianHeap, registers::Compare};
+use crate::{structures::MedianHeap, utils::Compare};
 
 use super::Metric;
 
@@ -7,7 +7,7 @@ pub struct RunningBenchmark<'a, InputType> {
     median_heap: MedianHeap<'a, InputType>,
 }
 
-impl<'a, InputType> Metric for RunningBenchmark<'a, InputType>
+impl<'a, InputType> RunningBenchmark<'a, InputType>
 where
     InputType: Compare,
 {
@@ -16,7 +16,12 @@ where
             median_heap: MedianHeap::<InputType>::new(),
         }
     }
+}
 
+impl<'a, InputType> Metric for RunningBenchmark<'a, InputType>
+where
+    InputType: Compare,
+{
     type ObservableType = &'a InputType;
 
     type ResultType = ComplexityBenchmark<Option<Self::ObservableType>>;
@@ -34,22 +39,33 @@ where
     }
 }
 
-pub struct ComplexityBenchmark<InputType> {
-    worst: InputType,
-    median: InputType,
-    best: InputType,
+#[derive(Clone, Debug)]
+pub struct ComplexityBenchmark<InputType>
+where
+    InputType: Clone,
+{
+    pub worst: InputType,
+    pub median: InputType,
+    pub best: InputType,
 }
 
-impl<InputType> ComplexityBenchmark<InputType> {
-    pub fn get_worst(&self) -> &InputType {
-        &self.worst
-    }
+pub trait Benchmark
+where
+    Self::InputType: Clone,
+{
+    type InputType;
 
-    pub fn get_median(&self) -> &InputType {
-        &self.median
-    }
+    fn get_worst(&self) -> Option<Self::InputType>;
 
-    pub fn get_best(&self) -> &InputType {
-        &self.best
+    fn get_median(&self) -> Option<Self::InputType>;
+
+    fn get_best(&self) -> Option<Self::InputType>;
+
+    fn get_benchmark_individuals(&self) -> ComplexityBenchmark<Option<Self::InputType>> {
+        ComplexityBenchmark {
+            worst: self.get_worst(),
+            median: self.get_median(),
+            best: self.get_best(),
+        }
     }
 }

@@ -1,3 +1,5 @@
+#![feature(trait_alias)]
+
 use lgp::{
     algorithm::{GeneticAlgorithm, HyperParameters},
     iris::iris_data::IrisLinearGeneticProgramming,

@@ -14,7 +14,7 @@ mod iris_ops {
     }
 
     fn divide(registers: &CollectionIndexPair, _data: &CollectionIndexPair) -> RegisterValue {
-        registers.get_value() / OrderedFloat(2f32)
+        registers.get_value() / OrderedFloat(2f64)
     }
 
     fn multiply(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
@@ -31,13 +31,14 @@ mod iris_tests {
 
     use crate::{
         algorithm::{GeneticAlgorithm, HyperParameters, LinearGeneticProgramming},
+        characteristics::FitnessScore,
         iris::iris_data::IrisInput,
-        metrics::ComplexityBenchmark,
+        metrics::{Benchmark, ComplexityBenchmark},
+        program::Program,
     };
 
     use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
     use more_asserts::{assert_le, assert_lt};
-    use ordered_float::OrderedFloat;
     use plotters::{
         prelude::{BitMapBackend, ChartBuilder, IntoDrawingArea, LineSeries, PathElement},
         style::{Color, IntoFont, BLACK, BLUE, GREEN, RED, WHITE},
@@ -65,30 +66,29 @@ mod iris_tests {
 
         gp.init_population().eval_population();
 
-        let mut benchmark = ComplexityBenchmark {
-            worst: gp.population.first().unwrap().fitness.unwrap(),
-            median: gp.population.middle().unwrap().fitness.unwrap(),
-            best: gp.population.last().unwrap().fitness.unwrap(),
-        };
-
-        let mut benchmarks: Vec<ComplexityBenchmark<OrderedFloat<f32>>> = vec![benchmark];
-
-        let mut generations = 0;
-
         const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
 
-        while benchmark.get_worst() != benchmark.get_median()
-            || benchmark.get_median() != benchmark.get_best()
-        {
+        let mut benchmarks: Vec<ComplexityBenchmark<Option<FitnessScore>>> = vec![];
+        let mut generations = 0;
+
+        loop {
+            let benchmark = gp.get_benchmark_individuals();
+            benchmarks.push(benchmark);
+            let benchmark_ref = benchmarks.last().unwrap();
+
             gp.apply_selection().breed().eval_population();
 
-            benchmark = gp.get_benchmark_individuals();
+            if benchmark_ref.worst == benchmark_ref.median
+                && benchmark_ref.median == benchmark_ref.best
+            {
+                break;
+            } else {
+                generations += 1;
 
-            generations += 1;
-
-            if generations > hyper_params.max_generations {
-                // TODO: Create concrete error type; SNAFU or Failure?
-                Err("Generations exceeded expect convergence time.")?;
+                if generations > hyper_params.max_generations {
+                    // TODO: Create concrete error type; SNAFU or Failure?
+                    return Err("Generations exceeded expect convergence time.")?;
+                }
             }
         }
 
@@ -99,24 +99,14 @@ mod iris_tests {
             .margin(5u32)
             .x_label_area_size(30u32)
             .y_label_area_size(30u32)
-            .build_cartesian_2d(0..benchmarks.len(), 0f32..1f32)?;
+            .build_cartesian_2d(0..benchmarks.len(), 0f64..1f64)?;
 
         chart.configure_mesh().draw()?;
 
         chart
             .draw_series(LineSeries::new(
-                (0..benchmarks.len()).map(|x_i| {
-                    (
-                        x_i,
-                        benchmarks
-                            .get(x_i)
-                            .unwrap()
-                            .best
-                            .fitness
-                            .unwrap()
-                            .into_inner(),
-                    )
-                }),
+                (0..benchmarks.len())
+                    .map(|x_i| (x_i, benchmarks.get(x_i).unwrap().best.unwrap().into_inner())),
                 &RED,
             ))?
             .label("Best")
@@ -127,13 +117,7 @@ mod iris_tests {
                 (0..benchmarks.len()).map(|x_i| {
                     (
                         x_i,
-                        benchmarks
-                            .get(x_i)
-                            .unwrap()
-                            .median
-                            .fitness
-                            .unwrap()
-                            .into_inner(),
+                        benchmarks.get(x_i).unwrap().median.unwrap().into_inner(),
                     )
                 }),
                 &GREEN,
@@ -146,13 +130,7 @@ mod iris_tests {
                 (0..benchmarks.len()).map(|x_i| {
                     (
                         x_i,
-                        benchmarks
-                            .get(x_i)
-                            .unwrap()
-                            .worst
-                            .fitness
-                            .unwrap()
-                            .into_inner(),
+                        benchmarks.get(x_i).unwrap().worst.unwrap().into_inner(),
                     )
                 }),
                 &BLUE,
@@ -318,12 +296,37 @@ mod iris_impl {
         characteristics::{Fitness, FitnessScore},
         inputs::Inputs,
         instruction::Instruction,
-        metrics::{Accuracy, Metric},
+        metrics::{Accuracy, Benchmark, Metric},
         program::Program,
         registers::{RegisterRepresentable, Registers},
     };
 
     use super::iris_data::{IrisClass, IrisInput, IrisLinearGeneticProgramming};
+
+    impl<'a> Benchmark for IrisLinearGeneticProgramming<'a> {
+        type InputType = FitnessScore;
+
+        fn get_worst(&self) -> Option<Self::InputType> {
+            match self.population.first() {
+                Some(&Program { fitness, .. }) => fitness,
+                _ => None,
+            }
+        }
+
+        fn get_median(&self) -> Option<Self::InputType> {
+            match self.population.middle() {
+                Some(&Program { fitness, .. }) => fitness,
+                _ => None,
+            }
+        }
+
+        fn get_best(&self) -> Option<Self::InputType> {
+            match self.population.last() {
+                Some(&Program { fitness, .. }) => fitness,
+                _ => None,
+            }
+        }
+    }
 
     impl<'a> GeneticAlgorithm<'a> for IrisLinearGeneticProgramming<'a> {
         type InputType = IrisInput;
@@ -447,7 +450,7 @@ mod iris_impl {
         fn eval_fitness(&self) -> FitnessScore {
             let inputs = self.inputs;
 
-            let mut fitness = Accuracy::new();
+            let mut fitness = Accuracy::<Option<usize>>::new();
 
             for input in inputs {
                 let mut registers = self.registers.clone();
@@ -461,10 +464,7 @@ mod iris_impl {
                 let correct_index = input.class as usize;
                 let registers_argmax = registers.argmax(IrisClass::COUNT, correct_index);
 
-                <Accuracy as Metric>::observe(
-                    &mut fitness,
-                    Some(correct_index) == registers_argmax,
-                );
+                fitness.observe([registers_argmax, Some(correct_index)]);
 
                 registers.reset();
             }
@@ -480,13 +480,13 @@ pub mod iris_data {
     use core::fmt;
     use std::fmt::Display;
 
-    use ordered_float::OrderedFloat;
     use serde::{Deserialize, Serialize};
     use strum::EnumCount;
 
     use crate::{
         algorithm::LinearGeneticProgramming,
-        registers::{Compare, RegisterRepresentable, Registers, Show},
+        registers::{RegisterRepresentable, RegisterValue, Registers},
+        utils::{Compare, Show},
     };
 
     pub const IRIS_DATASET_LINK: &'static str =
@@ -504,6 +504,7 @@ pub mod iris_data {
         strum::Display,
         Serialize,
         Deserialize,
+        Hash,
     )]
     #[serde(rename_all = "lowercase")]
     pub enum IrisClass {
@@ -514,12 +515,12 @@ pub mod iris_data {
 
     pub type IrisLinearGeneticProgramming<'a> = LinearGeneticProgramming<'a, IrisInput>;
 
-    #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq, Serialize)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq, Serialize, Hash)]
     pub struct IrisInput {
-        sepal_length: OrderedFloat<f32>,
-        sepal_width: OrderedFloat<f32>,
-        petal_length: OrderedFloat<f32>,
-        petal_width: OrderedFloat<f32>,
+        sepal_length: RegisterValue,
+        sepal_width: RegisterValue,
+        petal_length: RegisterValue,
+        petal_width: RegisterValue,
         pub class: IrisClass,
     }
 
@@ -529,9 +530,6 @@ pub mod iris_data {
             f.write_str(&serialized)
         }
     }
-
-    impl Show for IrisInput {}
-    impl Compare for IrisInput {}
 
     impl RegisterRepresentable for IrisInput {
         fn get_number_classes() -> usize {

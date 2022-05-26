@@ -1,20 +1,18 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::collections::{HashMap, HashSet};
 
 use ordered_float::OrderedFloat;
 use serde::Serialize;
-use std::fmt;
 
-pub type RegisterValue = OrderedFloat<f32>;
+use crate::utils::{Compare, Show};
+
+pub type RegisterValue = OrderedFloat<f64>;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Registers(Vec<RegisterValue>);
 
 impl Registers {
     pub fn new(n_registers: usize) -> Registers {
-        Registers(vec![OrderedFloat(0f32); n_registers])
+        Registers(vec![OrderedFloat(0f64); n_registers])
     }
 
     pub fn from(vec: Vec<RegisterValue>) -> Registers {
@@ -25,7 +23,7 @@ impl Registers {
         let Registers(internal_registers) = self;
 
         for index in 0..internal_registers.len() {
-            internal_registers[index] = OrderedFloat(0f32);
+            internal_registers[index] = OrderedFloat(0f64);
         }
     }
 
@@ -51,7 +49,7 @@ impl Registers {
     /// Returns:
     ///  `desired_index` if argmax is desired_index else None.
     pub fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
-        let mut arg_lookup: HashMap<OrderedFloat<f32>, HashSet<usize>> = HashMap::new();
+        let mut arg_lookup: HashMap<RegisterValue, HashSet<usize>> = HashMap::new();
 
         let Registers(registers) = &self;
 
@@ -76,9 +74,6 @@ impl Registers {
         None
     }
 }
-
-pub trait Compare: PartialEq + Eq + PartialOrd + Ord {}
-pub trait Show: fmt::Debug + Display + Serialize {}
 
 pub trait RegisterRepresentable: Into<Registers> + Clone + Compare + Show {
     fn get_number_classes() -> usize;
