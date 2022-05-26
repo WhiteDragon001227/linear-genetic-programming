@@ -9,7 +9,7 @@ jobs:
       - run: mkdir -p /tmp/tests/plots
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
       - uses: actions-rs/cargo@v1
         with:
           command: test
