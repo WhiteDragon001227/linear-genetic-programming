@@ -2,6 +2,8 @@
 
 A framework for implementing algorithms involving Linear Genetic Programming.
 
+![build passing](https://github.com/urmzd/linear-genetic-programming/actions/workflows/develop.yml/badge.svg)
+
 ## Modules
 
 -   [Metrics](src/metrics.rs)
