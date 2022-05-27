@@ -34,7 +34,6 @@ mod iris_tests {
         characteristics::FitnessScore,
         iris::iris_data::IrisInput,
         metrics::{Benchmark, ComplexityBenchmark},
-        program::Program,
     };
 
     use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
@@ -64,7 +63,7 @@ mod iris_tests {
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
-        gp.init_population().eval_population();
+        gp.init_population().evaluate().rank();
 
         const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
 
@@ -76,7 +75,7 @@ mod iris_tests {
             benchmarks.push(benchmark);
             let benchmark_ref = benchmarks.last().unwrap();
 
-            gp.apply_selection().breed().eval_population();
+            gp.apply_selection().breed().evaluate().rank();
 
             if benchmark_ref.worst == benchmark_ref.median
                 && benchmark_ref.median == benchmark_ref.best
@@ -368,15 +367,13 @@ mod iris_impl {
             self
         }
 
-        fn eval_population(&mut self) -> &mut Self {
+        fn evaluate(&mut self) -> &mut Self {
             for individual in self.population.get_mut_pop() {
                 individual.fitness = match individual.fitness {
                     None => Some(individual.eval_fitness()),
                     Some(fitness) => Some(fitness),
                 }
             }
-
-            self.population.sort();
 
             self
         }
@@ -418,6 +415,11 @@ mod iris_impl {
                 population.push(individual)
             }
 
+            self
+        }
+
+        fn rank(&mut self) -> &mut Self {
+            self.population.sort();
             self
         }
     }
@@ -486,7 +488,6 @@ pub mod iris_data {
     use crate::{
         algorithm::LinearGeneticProgramming,
         registers::{RegisterRepresentable, RegisterValue, Registers},
-        utils::{Compare, Show},
     };
 
     pub const IRIS_DATASET_LINK: &'static str =

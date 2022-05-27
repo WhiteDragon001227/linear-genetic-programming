@@ -18,7 +18,7 @@ fn main() {
     let inputs = IrisLinearGeneticProgramming::load_inputs("./data.csv");
     let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
 
-    gp.init_population().eval_population();
+    gp.init_population().evaluate();
 
     for _ in 0..hyper_params.max_generations {
         gp.apply_selection().breed();

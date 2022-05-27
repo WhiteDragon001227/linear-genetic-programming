@@ -102,7 +102,9 @@ where
 
     fn init_population(&mut self) -> &mut Self;
 
-    fn eval_population(&mut self) -> &mut Self;
+    fn evaluate(&mut self) -> &mut Self;
+
+    fn rank(&mut self) -> &mut Self;
 
     fn apply_selection(&mut self) -> &mut Self;
 
