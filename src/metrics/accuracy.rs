@@ -2,9 +2,9 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
-use crate::utils::Compare;
+use crate::utils::alias::Compare;
 
-use super::Metric;
+use super::definitions::Metric;
 
 type ComparablePair<K> = [K; 2];
 

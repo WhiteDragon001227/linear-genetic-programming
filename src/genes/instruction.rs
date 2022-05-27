@@ -1,6 +1,3 @@
-use crate::containers::CollectionIndexPair;
-use crate::registers::{RegisterRepresentable, Registers};
-use crate::utils::AnyExecutable;
 use num_derive::FromPrimitive;
 use rand::distributions::uniform::{UniformInt, UniformSampler};
 use rand::prelude::{SliceRandom, StdRng};
@@ -11,6 +8,11 @@ use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use strum::EnumCount;
+
+use crate::utils::alias::AnyExecutable;
+use crate::utils::containers::CollectionIndexPair;
+
+use super::internal_repr::{RegisterRepresentable, Registers};
 
 #[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq, Serialize)]
 pub enum Modes {
@@ -109,7 +111,7 @@ impl Instruction {
             },
         )
         .sample(&mut thread_rng());
-        let exec = executables.choose(&mut thread_rng()).unwrap();
+        let exec = executables.choose(GENERATOR).unwrap();
         // update target index
 
         Instruction {

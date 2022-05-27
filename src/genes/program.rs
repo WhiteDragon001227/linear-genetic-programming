@@ -2,12 +2,15 @@ use std::fmt::Display;
 
 use serde::Serialize;
 
-use crate::{
-    characteristics::FitnessScore,
-    inputs::Inputs,
+use crate::utils::alias::Inputs;
+
+use super::{
+    characteristics::{Breed, Fitness, FitnessScore, Generate, Mutate},
     instruction::Instruction,
-    registers::{RegisterRepresentable, Registers},
+    internal_repr::{RegisterRepresentable, Registers},
 };
+
+trait Organism<T> = Fitness + Breed + Mutate + Generate<T>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Program<'a, InputType>

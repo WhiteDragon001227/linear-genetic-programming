@@ -6,9 +6,9 @@ A framework for implementing algorithms involving Linear Genetic Programming.
 
 ## Modules
 
--   [Metrics](src/metrics.rs)
--   [Iris](src/iris.rs)
--   [Algorithm](src/algorithm.rs)
+- [Metrics](src/metrics)
+- [Data](src/data)
+- [Genes](src/genes)
 
 ## Examples
 

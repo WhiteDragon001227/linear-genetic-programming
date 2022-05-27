@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use ordered_float::OrderedFloat;
 use serde::Serialize;
 
-use crate::utils::{Compare, Show};
+use crate::utils::alias::{Compare, Show};
 
 pub type RegisterValue = OrderedFloat<f64>;
 
@@ -46,8 +46,6 @@ impl Registers {
         panic!("Invalid Index: {}; Len: {}", index, len)
     }
 
-    /// Returns:
-    ///  `desired_index` if argmax is desired_index else None.
     pub fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
         let mut arg_lookup: HashMap<RegisterValue, HashSet<usize>> = HashMap::new();
 
@@ -75,7 +73,4 @@ impl Registers {
     }
 }
 
-pub trait RegisterRepresentable: Into<Registers> + Clone + Compare + Show {
-    fn get_number_classes() -> usize;
-    fn get_number_features() -> usize;
-}
+pub trait RegisterRepresentable = Into<Registers> + Clone + Compare + Show;

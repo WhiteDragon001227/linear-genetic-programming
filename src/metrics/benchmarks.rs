@@ -1,6 +1,6 @@
-use crate::{structures::MedianHeap, utils::Compare};
+use crate::utils::{alias::Compare, median_heap::MedianHeap};
 
-use super::Metric;
+use super::definitions::Metric;
 
 #[derive(Debug, Clone)]
 pub struct RunningBenchmark<'a, InputType> {

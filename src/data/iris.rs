@@ -1,9 +1,10 @@
 mod iris_ops {
     use ordered_float::OrderedFloat;
 
-    use crate::containers::CollectionIndexPair;
-    use crate::registers::RegisterValue;
-    use crate::utils::AnyExecutable;
+    use crate::{
+        genes::internal_repr::RegisterValue,
+        utils::{alias::AnyExecutable, containers::CollectionIndexPair},
+    };
 
     fn add(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
         registers.get_value() + data.get_value()
@@ -21,7 +22,7 @@ mod iris_ops {
         registers.get_value() * data.get_value()
     }
 
-    pub const EXECUTABLES: &'static [AnyExecutable; 4] =
+    pub const EXECUTABLES: &'static [AnyExecutable] =
         &[self::add, self::subtract, self::divide, self::multiply];
 }
 
@@ -30,10 +31,9 @@ mod iris_tests {
     use std::error;
 
     use crate::{
-        algorithm::{GeneticAlgorithm, HyperParameters, LinearGeneticProgramming},
-        characteristics::FitnessScore,
-        iris::iris_data::IrisInput,
-        metrics::{Benchmark, ComplexityBenchmark},
+        data::iris::iris_data::IrisInput,
+        genes::{algorithm::HyperParameters, characteristics::FitnessScore},
+        metrics::benchmarks::ComplexityBenchmark,
     };
 
     use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
@@ -58,6 +58,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
+            data_path: todo!(),
         };
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
@@ -169,6 +170,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
+            data_path: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -198,6 +200,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
+            data_path: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -225,6 +228,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
+            data_path: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -269,7 +273,7 @@ mod iris_tests {
     async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmpfile) = get_iris_content().await?;
-        let inputs = LinearGeneticProgramming::<IrisInput>::load_inputs(tmpfile.path());
+        let inputs = IrisLinearGeneticProgramming::load_inputs(tmpfile.path());
         assert_ne!(inputs.len(), 0);
         Ok(())
     }
@@ -284,23 +288,28 @@ mod iris_impl {
     use rand::{
         distributions::uniform::{UniformInt, UniformSampler},
         prelude::IteratorRandom,
-        thread_rng,
     };
     use strum::EnumCount;
 
     use crate::{
-        algorithm::{
-            self, GeneticAlgorithm, HyperParameters, LinearGeneticProgramming, Population,
+        genes::{
+            algorithm::{GeneticAlgorithm, HyperParameters},
+            characteristics::{Fitness, FitnessScore},
+            instruction::Instruction,
+            internal_repr::Registers,
+            program::Program,
         },
-        characteristics::{Fitness, FitnessScore},
-        inputs::Inputs,
-        instruction::Instruction,
-        metrics::{Accuracy, Benchmark, Metric},
-        program::Program,
-        registers::{RegisterRepresentable, Registers},
+        metrics::{accuracy::Accuracy, benchmarks::Benchmark},
+        utils::{
+            alias::{AnyExecutable, Inputs},
+            random::GENERATOR,
+        },
     };
 
-    use super::iris_data::{IrisClass, IrisInput, IrisLinearGeneticProgramming};
+    use super::{
+        iris_data::{IrisClass, IrisInput, IrisLinearGeneticProgramming},
+        iris_ops,
+    };
 
     impl<'a> Benchmark for IrisLinearGeneticProgramming<'a> {
         type InputType = FitnessScore;
@@ -344,23 +353,13 @@ mod iris_impl {
             return raw_inputs;
         }
 
-        fn new(
-            hyper_params: algorithm::HyperParameters,
-            inputs: &'a Inputs<Self::InputType>,
-        ) -> Self {
-            let population: Population<'a, Self::InputType> =
-                Population::new(hyper_params.population_size);
-
-            LinearGeneticProgramming {
-                population,
-                inputs,
-                hyper_params,
-            }
-        }
-
         fn init_population(&mut self) -> &mut Self {
             for _ in 0..self.hyper_params.population_size {
-                let program = Program::generate(&self.inputs, self.hyper_params.max_program_size);
+                let program = Program::generate(
+                    &self.inputs,
+                    self.hyper_params.max_program_size,
+                    iris_ops::EXECUTABLES,
+                );
                 VecDeque::push_front(self.population.get_mut_pop(), program)
             }
 
@@ -425,15 +424,16 @@ mod iris_impl {
     }
 
     impl<'a> Program<'a, IrisInput> {
-        pub fn generate(inputs: &'a Inputs<IrisInput>, max_instructions: usize) -> Self {
-            let register_len = <IrisInput as RegisterRepresentable>::get_number_classes();
+        pub fn generate(
+            inputs: &'a Inputs<IrisInput>,
+            max_instructions: usize,
+            executables: &[AnyExecutable],
+        ) -> Self {
+            let register_len = 4;
+            let input_len = 4;
             let registers = Registers::new(register_len);
-            let input_len = <IrisInput as RegisterRepresentable>::get_number_features();
 
-            let executables = super::iris_ops::EXECUTABLES;
-
-            let n_instructions =
-                UniformInt::<usize>::new(0, max_instructions).sample(&mut thread_rng());
+            let n_instructions = UniformInt::<usize>::new(0, max_instructions).sample(GENERATOR);
 
             let instructions: Vec<Instruction> = (0..n_instructions)
                 .map(|_| Instruction::generate(register_len, input_len, executables))
@@ -449,7 +449,7 @@ mod iris_impl {
     }
 
     impl<'a> Fitness for Program<'a, IrisInput> {
-        fn eval_fitness(&self) -> FitnessScore {
+        fn eval(&self) -> FitnessScore {
             let inputs = self.inputs;
 
             let mut fitness = Accuracy::<Option<usize>>::new();
@@ -484,11 +484,6 @@ pub mod iris_data {
 
     use serde::{Deserialize, Serialize};
     use strum::EnumCount;
-
-    use crate::{
-        algorithm::LinearGeneticProgramming,
-        registers::{RegisterRepresentable, RegisterValue, Registers},
-    };
 
     pub const IRIS_DATASET_LINK: &'static str =
         "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
@@ -531,16 +526,6 @@ pub mod iris_data {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let serialized = toml::to_string(&self).unwrap();
             f.write_str(&serialized)
-        }
-    }
-
-    impl RegisterRepresentable for IrisInput {
-        fn get_number_classes() -> usize {
-            IrisClass::COUNT
-        }
-
-        fn get_number_features() -> usize {
-            4
         }
     }
 

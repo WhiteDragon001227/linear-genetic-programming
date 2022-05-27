@@ -1,8 +1,6 @@
-use crate::inputs::Inputs;
-use crate::program::Program;
-use crate::registers::RegisterRepresentable;
 use std::collections::VecDeque;
-use std::path::PathBuf;
+
+use crate::{genes::internal_repr::RegisterRepresentable, genes::program::Program};
 
 type InnerPopulation<'a, InputType> = VecDeque<Program<'a, InputType>>;
 #[derive(Debug, Clone)]
@@ -67,46 +65,4 @@ where
     pub fn capacity(&self) -> usize {
         self.1
     }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct HyperParameters {
-    pub population_size: usize,
-    pub max_program_size: usize,
-    pub gap: f32,
-    pub max_generations: usize,
-}
-
-pub struct LinearGeneticProgramming<'a, InputType>
-where
-    InputType: RegisterRepresentable,
-{
-    pub population: Population<'a, InputType>,
-    pub inputs: &'a Inputs<InputType>,
-    pub hyper_params: HyperParameters,
-}
-
-pub trait GeneticAlgorithm<'a>
-where
-    Self::InputType: RegisterRepresentable,
-{
-    type InputType;
-
-    fn init_env() -> () {
-        pretty_env_logger::init();
-    }
-
-    fn load_inputs(file_path: impl Into<PathBuf>) -> Inputs<Self::InputType>;
-
-    fn new(hyper_params: HyperParameters, inputs: &'a Inputs<Self::InputType>) -> Self;
-
-    fn init_population(&mut self) -> &mut Self;
-
-    fn evaluate(&mut self) -> &mut Self;
-
-    fn rank(&mut self) -> &mut Self;
-
-    fn apply_selection(&mut self) -> &mut Self;
-
-    fn breed(&mut self) -> &mut Self;
 }
