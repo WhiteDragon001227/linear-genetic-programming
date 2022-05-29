@@ -45,7 +45,10 @@ mod iris_tests {
 
     use crate::{
         data::iris::iris_data::IrisInput,
-        genes::{algorithm::HyperParameters, characteristics::FitnessScore},
+        genes::{
+            algorithm::{GeneticAlgorithm, HyperParameters},
+            characteristics::FitnessScore,
+        },
         metrics::benchmarks::ComplexityBenchmark,
     };
 
@@ -415,7 +418,10 @@ pub mod iris_data {
     use serde::{Deserialize, Serialize};
     use strum::EnumCount;
 
-    use crate::genes::registers::{RegisterValue, Registers};
+    use crate::genes::{
+        algorithm::GeneticAlgorithm,
+        registers::{RegisterValue, Registers},
+    };
 
     pub const IRIS_DATASET_LINK: &'static str =
         "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
@@ -444,6 +450,10 @@ pub mod iris_data {
     }
 
     pub struct IrisLinearGeneticProgramming;
+
+    impl GeneticAlgorithm for IrisLinearGeneticProgramming {
+        type InputType = IrisInput;
+    }
 
     #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq, Serialize, Hash)]
     pub struct IrisInput {
