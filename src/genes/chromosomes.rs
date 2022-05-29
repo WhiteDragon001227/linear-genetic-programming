@@ -9,11 +9,11 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use strum::EnumCount;
 
-use crate::utils::alias::AnyExecutable;
+use crate::utils::alias::{AnyExecutable, Executables};
 use crate::utils::containers::CollectionIndexPair;
 use crate::utils::random::GENERATOR;
 
-use super::internal_repr::{Registers, ValidInput};
+use super::registers::{RegisterValue, Registers, ValidInput};
 
 #[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq, Serialize)]
 pub enum Modes {
@@ -67,8 +67,8 @@ impl Instruction {
     pub fn apply(
         &self,
         registers: &mut Registers,
-        source_data: CollectionIndexPair,
-        target_data: CollectionIndexPair,
+        source_data: &[RegisterValue],
+        target_data: &[RegisterValue],
     ) -> () {
         let value = (self.exec)(&source_data, &target_data);
         let index = source_data.get_index();
@@ -79,7 +79,7 @@ impl Instruction {
         &self,
         registers: &Registers,
         input: &InputType,
-    ) -> [CollectionIndexPair; 2]
+    ) -> [&[RegisterValue]; 2]
     where
         InputType: ValidInput + Clone,
     {
@@ -95,7 +95,7 @@ impl Instruction {
         data
     }
 
-    pub fn generate(registers_len: usize, data_len: usize, executables: &[AnyExecutable]) -> Self {
+    pub fn generate(registers_len: usize, data_len: usize, executables: Executables) -> Self {
         // Sanity check
         assert!(executables.len() != 0);
         assert!(registers_len != 0);

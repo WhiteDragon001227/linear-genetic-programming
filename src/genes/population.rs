@@ -1,31 +1,30 @@
 use std::collections::VecDeque;
 
-use crate::{genes::internal_repr::ValidInput, genes::program::Program};
-
-type InnerPopulation<'a, InputType> = VecDeque<Program<'a, InputType>>;
+use super::characteristics::Organism;
+type InnerPopulation<T> = VecDeque<T>;
 #[derive(Debug, Clone)]
-pub struct Population<'a, InputType>(InnerPopulation<'a, InputType>, usize)
+pub struct Population<T>(InnerPopulation<T>, usize)
 where
-    InputType: ValidInput;
+    T: Organism;
 
-impl<'a, InputType> Population<'a, InputType>
+impl<T> Population<T>
 where
-    InputType: ValidInput,
+    T: Organism,
 {
     pub fn new(population_size: usize) -> Self {
         let collection = VecDeque::with_capacity(population_size);
         Population(collection, population_size)
     }
 
-    pub fn get_mut_pop(&mut self) -> &mut InnerPopulation<'a, InputType> {
+    pub fn get_mut_pop(&mut self) -> &mut InnerPopulation<T> {
         &mut self.0
     }
 
-    pub fn get_pop(&self) -> &InnerPopulation<'a, InputType> {
+    pub fn get_pop(&self) -> &InnerPopulation<T> {
         &self.0
     }
 
-    pub fn get(&self, index: usize) -> Option<&Program<'a, InputType>> {
+    pub fn get(&self, index: usize) -> Option<&T> {
         self.0.get(index)
     }
 
@@ -33,20 +32,20 @@ where
         self.0.make_contiguous().sort();
     }
 
-    pub fn first(&self) -> Option<&Program<'a, InputType>> {
+    pub fn first(&self) -> Option<&T> {
         self.0.get(0)
     }
 
-    pub fn last(&self) -> Option<&Program<'a, InputType>> {
+    pub fn last(&self) -> Option<&T> {
         self.0.get(self.0.len() - 1)
     }
 
-    pub fn middle(&self) -> Option<&Program<'a, InputType>> {
+    pub fn middle(&self) -> Option<&T> {
         self.0
             .get(math::round::floor(self.0.len() as f64 / 2f64, 1) as usize)
     }
 
-    pub fn f_push(&mut self, value: Program<'a, InputType>) -> () {
+    pub fn f_push(&mut self, value: T) -> () {
         self.0.push_front(value)
     }
 
@@ -54,7 +53,7 @@ where
         self.0.pop_front();
     }
 
-    pub fn push(&mut self, value: Program<'a, InputType>) -> () {
+    pub fn push(&mut self, value: T) -> () {
         self.0.push_back(value)
     }
 

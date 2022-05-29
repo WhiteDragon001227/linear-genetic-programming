@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use csv::ReaderBuilder;
 
-use crate::utils::alias::{AnyExecutable, Executables, Inputs};
+use crate::utils::alias::{Executables, Inputs};
 
-use super::{internal_repr::ValidInput, population::Population, program::Program};
+use super::{characteristics::Organism, population::Population, registers::ValidInput};
 
 #[derive(Clone)]
 pub struct HyperParameters {
@@ -41,39 +41,32 @@ where
         inputs
     }
 
-    fn init_population<'a>(
+    fn init_population<'a, T>(
         hyper_params: &HyperParameters,
         inputs: &Inputs<Self::InputType>,
-    ) -> Population<'a, Self::InputType> {
-        let mut population = Population::new(hyper_params.population_size);
+        program_params: T::GenerateParamsType,
+    ) -> Population<T>
+    where
+        T: Organism,
+    {
+        let mut population: Population<T> = Population::new(hyper_params.population_size);
 
         for _ in 0..hyper_params.population_size {
-            let program = Program::generate(
-                inputs,
-                hyper_params.max_program_size,
-                hyper_params.executables,
-            );
+            let program = T::generate(Some(program_params));
             population.push(program)
         }
 
         population
     }
 
-    fn evaluate<'a>(
-        population: &'a mut Population<'a, Self::InputType>,
-    ) -> &'a mut Population<'a, Self::InputType>;
+    fn evaluate<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T>;
 
-    fn rank<'a>(
-        population: &'a mut Population<'a, Self::InputType>,
-    ) -> &'a mut Population<'a, Self::InputType>;
+    fn rank<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T>;
 
-    fn apply_selection<'a>(
-        population: &'a mut Population<'a, Self::InputType>,
-    ) -> &'a mut Population<'a, Self::InputType>;
+    fn apply_selection<'a, T: Organism>(population: &'a mut Population<T>)
+        -> &'a mut Population<T>;
 
-    fn breed<'a>(
-        population: &'a mut Population<'a, Self::InputType>,
-    ) -> &'a mut Population<'a, Self::InputType>;
+    fn breed<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T>;
 
     fn execute(data: &impl Into<PathBuf>) -> () {}
 }

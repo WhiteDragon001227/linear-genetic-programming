@@ -5,12 +5,10 @@ use serde::Serialize;
 use crate::utils::alias::Inputs;
 
 use super::{
-    characteristics::{Breed, Fitness, FitnessScore, Generate, Mutate},
-    instruction::Instruction,
-    internal_repr::{Registers, ValidInput},
+    characteristics::FitnessScore,
+    chromosomes::Instruction,
+    registers::{Registers, ValidInput},
 };
-
-pub trait Organism<T> = Fitness + Breed + Mutate + Generate<T>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Program<'a, InputType>

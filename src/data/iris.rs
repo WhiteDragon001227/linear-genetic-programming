@@ -1,26 +1,39 @@
+#[macro_export]
+macro_rules! executable {
+    ( $fn_name: ident,  $op: tt, $val: expr) => {
+        fn $fn_name<'r>(registers: &'r mut [RegisterValue], data: &[RegisterValue]) -> &'r [RegisterValue] {
+            assert_eq!(registers.len(), data.len());
+
+            for index in 0..registers.len() {
+                registers[index] = registers[index] $op $val
+            }
+
+            return registers;
+        }
+    };
+
+    ( $fn_name: ident, $op: tt) => {
+        fn $fn_name<'r>(registers: &'r mut [RegisterValue], data: &[RegisterValue]) -> &'r [RegisterValue] {
+            assert_eq!(registers.len(), data.len());
+
+            for index in 0..registers.len() {
+                registers[index] = registers[index] $op data[index]
+            }
+
+            return registers;
+        }
+    };
+
+}
 mod iris_ops {
     use ordered_float::OrderedFloat;
 
-    use crate::{
-        genes::internal_repr::RegisterValue,
-        utils::{alias::AnyExecutable, containers::CollectionIndexPair},
-    };
+    use crate::{genes::registers::RegisterValue, utils::alias::AnyExecutable};
 
-    fn add(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
-        registers.get_value() + data.get_value()
-    }
-
-    fn subtract(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
-        registers.get_value() - data.get_value()
-    }
-
-    fn divide(registers: &CollectionIndexPair, _data: &CollectionIndexPair) -> RegisterValue {
-        registers.get_value() / OrderedFloat(2f64)
-    }
-
-    fn multiply(registers: &CollectionIndexPair, data: &CollectionIndexPair) -> RegisterValue {
-        registers.get_value() * data.get_value()
-    }
+    executable!(add, +);
+    executable!(multiply, *);
+    executable!(subtract, -);
+    executable!(divide, /, OrderedFloat(2f64));
 
     pub const EXECUTABLES: &'static [AnyExecutable] =
         &[self::add, self::subtract, self::divide, self::multiply];
@@ -58,7 +71,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            data_path: todo!(),
+            executables: todo!(),
         };
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
@@ -170,7 +183,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            data_path: todo!(),
+            executables: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -200,7 +213,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            data_path: todo!(),
+            executables: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -228,7 +241,7 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            data_path: todo!(),
+            executables: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -295,9 +308,9 @@ mod iris_impl {
         genes::{
             algorithm::{GeneticAlgorithm, HyperParameters},
             characteristics::{Fitness, FitnessScore},
-            instruction::Instruction,
-            internal_repr::Registers,
+            chromosomes::Instruction,
             program::Program,
+            registers::Registers,
         },
         metrics::{accuracy::Accuracy, benchmarks::Benchmark},
         utils::{
@@ -338,13 +351,6 @@ mod iris_impl {
 
     impl GeneticAlgorithm for IrisLinearGeneticProgramming {
         type InputType = IrisInput;
-
-        fn init_population(
-            hyper_params: &HyperParameters,
-            inputs: Input<Self::InputType>,
-        ) -> &mut Self {
-            self
-        }
 
         fn evaluate(&mut self) -> &mut Self {
             for individual in self.population.get_mut_pop() {
@@ -465,7 +471,7 @@ pub mod iris_data {
     use serde::{Deserialize, Serialize};
     use strum::EnumCount;
 
-    use crate::genes::internal_repr::{RegisterValue, Registers};
+    use crate::genes::registers::{RegisterValue, Registers};
 
     pub const IRIS_DATASET_LINK: &'static str =
         "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";

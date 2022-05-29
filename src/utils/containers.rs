@@ -1,4 +1,4 @@
-use crate::genes::internal_repr::{RegisterValue, Registers};
+use crate::genes::registers::{RegisterValue, Registers};
 
 #[derive(Debug, Clone)]
 pub struct CollectionIndexPair(Registers, usize);

@@ -4,12 +4,10 @@ use std::hash::Hash;
 
 use serde::Serialize;
 
-use crate::genes::internal_repr::RegisterValue;
-
-use super::containers::CollectionIndexPair;
+use crate::genes::registers::RegisterValue;
 
 pub type AnyExecutable =
-    for<'r, 's> fn(&'r CollectionIndexPair, &'s CollectionIndexPair) -> RegisterValue;
+    for<'r, 's> fn(&'r mut [RegisterValue], &'s [RegisterValue]) -> &'r [RegisterValue];
 
 pub type Executables = &'static [AnyExecutable];
 

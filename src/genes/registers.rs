@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use ordered_float::OrderedFloat;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::utils::alias::{Compare, Show};
 

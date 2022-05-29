@@ -1,7 +1,8 @@
-use crate::utils::alias::Show;
+use crate::utils::alias::{Compare, Show};
 
-use super::internal_repr::RegisterValue;
+use super::{chromosomes::Instruction, registers::RegisterValue};
 
+pub type FitnessScore = RegisterValue;
 pub trait Fitness: Show {
     fn eval(&self) -> FitnessScore;
 }
@@ -14,8 +15,9 @@ pub trait Mutate: Show {
     fn mutate(&mut self) -> () {}
 }
 
-pub trait Generate<T> {
-    fn generate(parameters: T) -> Self;
+pub trait Generate {
+    type GenerateParamsType;
+    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self;
 }
 
 pub trait Meta {
@@ -23,4 +25,6 @@ pub trait Meta {
     fn get_number_of_classes() -> usize;
 }
 
-pub type FitnessScore = RegisterValue;
+pub trait Organism: Fitness + Breed + Mutate + Generate + Compare {
+    fn get_instructions(&self) -> &[Instruction];
+}
