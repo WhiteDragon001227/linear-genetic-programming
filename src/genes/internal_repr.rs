@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use ordered_float::OrderedFloat;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::utils::alias::{Compare, Show};
 
@@ -38,12 +38,7 @@ impl Registers {
     }
 
     pub fn get_value_at_index(&self, index: usize) -> RegisterValue {
-        let len = self.len();
-        if index < len {
-            return self.0[index];
-        }
-
-        panic!("Invalid Index: {}; Len: {}", index, len)
+        self.0[index]
     }
 
     pub fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {
@@ -73,4 +68,4 @@ impl Registers {
     }
 }
 
-pub trait RegisterRepresentable = Into<Registers> + Clone + Compare + Show;
+pub trait ValidInput = Into<Registers> + Clone + Compare + Show + DeserializeOwned;

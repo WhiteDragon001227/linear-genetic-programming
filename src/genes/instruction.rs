@@ -11,8 +11,9 @@ use strum::EnumCount;
 
 use crate::utils::alias::AnyExecutable;
 use crate::utils::containers::CollectionIndexPair;
+use crate::utils::random::GENERATOR;
 
-use super::internal_repr::{RegisterRepresentable, Registers};
+use super::internal_repr::{Registers, ValidInput};
 
 #[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq, Serialize)]
 pub enum Modes {
@@ -80,7 +81,7 @@ impl Instruction {
         input: &InputType,
     ) -> [CollectionIndexPair; 2]
     where
-        InputType: RegisterRepresentable + Clone,
+        InputType: ValidInput + Clone,
     {
         let target_data = match &self.mode {
             Modes::Input => input.clone().into(),
@@ -100,7 +101,7 @@ impl Instruction {
         assert!(registers_len != 0);
         assert!(data_len != 0);
 
-        let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut thread_rng());
+        let source_index = UniformInt::<usize>::new(0, registers_len).sample(GENERATOR);
         let mode = StdRng::from_entropy().sample(Standard);
         let target_index = UniformInt::<usize>::new(
             0,

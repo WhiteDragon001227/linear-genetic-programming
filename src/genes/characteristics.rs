@@ -18,4 +18,9 @@ pub trait Generate<T> {
     fn generate(parameters: T) -> Self;
 }
 
+pub trait Meta {
+    fn get_number_of_features() -> usize;
+    fn get_number_of_classes() -> usize;
+}
+
 pub type FitnessScore = RegisterValue;

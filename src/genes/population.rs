@@ -1,16 +1,16 @@
 use std::collections::VecDeque;
 
-use crate::{genes::internal_repr::RegisterRepresentable, genes::program::Program};
+use crate::{genes::internal_repr::ValidInput, genes::program::Program};
 
 type InnerPopulation<'a, InputType> = VecDeque<Program<'a, InputType>>;
 #[derive(Debug, Clone)]
 pub struct Population<'a, InputType>(InnerPopulation<'a, InputType>, usize)
 where
-    InputType: RegisterRepresentable;
+    InputType: ValidInput;
 
 impl<'a, InputType> Population<'a, InputType>
 where
-    InputType: RegisterRepresentable,
+    InputType: ValidInput,
 {
     pub fn new(population_size: usize) -> Self {
         let collection = VecDeque::with_capacity(population_size);

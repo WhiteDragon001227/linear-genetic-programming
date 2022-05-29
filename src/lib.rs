@@ -2,5 +2,5 @@
 
 pub mod data;
 pub mod genes;
-mod metrics;
-mod utils;
+pub mod metrics;
+pub mod utils;

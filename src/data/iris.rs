@@ -311,7 +311,7 @@ mod iris_impl {
         iris_ops,
     };
 
-    impl<'a> Benchmark for IrisLinearGeneticProgramming<'a> {
+    impl<'a> Benchmark for IrisLinearGeneticProgramming {
         type InputType = FitnessScore;
 
         fn get_worst(&self) -> Option<Self::InputType> {
@@ -336,33 +336,13 @@ mod iris_impl {
         }
     }
 
-    impl<'a> GeneticAlgorithm<'a> for IrisLinearGeneticProgramming<'a> {
+    impl GeneticAlgorithm for IrisLinearGeneticProgramming {
         type InputType = IrisInput;
 
-        fn load_inputs(file_path: impl Into<PathBuf>) -> Inputs<Self::InputType> {
-            let mut csv_reader = ReaderBuilder::new()
-                .has_headers(false)
-                .from_path(file_path.into())
-                .unwrap();
-
-            let raw_inputs: Vec<IrisInput> = csv_reader
-                .deserialize()
-                .map(|input| -> IrisInput { input.unwrap() })
-                .collect();
-
-            return raw_inputs;
-        }
-
-        fn init_population(&mut self) -> &mut Self {
-            for _ in 0..self.hyper_params.population_size {
-                let program = Program::generate(
-                    &self.inputs,
-                    self.hyper_params.max_program_size,
-                    iris_ops::EXECUTABLES,
-                );
-                VecDeque::push_front(self.population.get_mut_pop(), program)
-            }
-
+        fn init_population(
+            hyper_params: &HyperParameters,
+            inputs: Input<Self::InputType>,
+        ) -> &mut Self {
             self
         }
 
@@ -485,6 +465,8 @@ pub mod iris_data {
     use serde::{Deserialize, Serialize};
     use strum::EnumCount;
 
+    use crate::genes::internal_repr::{RegisterValue, Registers};
+
     pub const IRIS_DATASET_LINK: &'static str =
         "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/bezdekIris.data";
 
@@ -511,7 +493,7 @@ pub mod iris_data {
         Virginica = 2,
     }
 
-    pub type IrisLinearGeneticProgramming<'a> = LinearGeneticProgramming<'a, IrisInput>;
+    pub struct IrisLinearGeneticProgramming;
 
     #[derive(Deserialize, Debug, Clone, PartialEq, Ord, PartialOrd, Eq, Serialize, Hash)]
     pub struct IrisInput {

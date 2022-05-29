@@ -11,6 +11,8 @@ use super::containers::CollectionIndexPair;
 pub type AnyExecutable =
     for<'r, 's> fn(&'r CollectionIndexPair, &'s CollectionIndexPair) -> RegisterValue;
 
+pub type Executables = &'static [AnyExecutable];
+
 pub trait Compare<V = Self> = PartialEq<V> + Eq + PartialOrd + Ord + Hash where V: Clone;
 pub trait Show = fmt::Debug + Display + Serialize;
 
