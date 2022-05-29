@@ -4,7 +4,8 @@ use super::{chromosomes::Instruction, registers::RegisterValue};
 
 pub type FitnessScore = RegisterValue;
 pub trait Fitness: Show {
-    fn eval(&self) -> FitnessScore;
+    fn retrieve_fitness(&self) -> FitnessScore;
+    fn lazy_retrieve_fitness(&mut self) -> ();
 }
 
 pub trait Breed: Show {

@@ -10,7 +10,6 @@ use std::fmt::Formatter;
 use strum::EnumCount;
 
 use crate::utils::alias::{AnyExecutable, Executables};
-use crate::utils::containers::CollectionIndexPair;
 use crate::utils::random::GENERATOR;
 
 use super::registers::{RegisterValue, Registers, ValidInput};
@@ -64,32 +63,21 @@ impl Debug for Instruction {
 }
 
 impl Instruction {
-    pub fn apply(
+    pub fn get_data<'a, InputType>(
         &self,
-        registers: &mut Registers,
-        source_data: &[RegisterValue],
-        target_data: &[RegisterValue],
-    ) -> () {
-        let value = (self.exec)(&source_data, &target_data);
-        let index = source_data.get_index();
-        registers.update(index, value);
-    }
-
-    pub fn get_data<InputType>(
-        &self,
-        registers: &Registers,
-        input: &InputType,
-    ) -> [&[RegisterValue]; 2]
+        registers: &'a mut Registers,
+        data: &'a InputType,
+    ) -> [&'a [RegisterValue]; 2]
     where
         InputType: ValidInput + Clone,
     {
-        let target_data = match &self.mode {
-            Modes::Input => input.clone().into(),
-            Modes::Registers => registers.clone(),
+        let target_data = match self.mode {
+            Modes::Registers => registers,
+            Modes::Input => todo!(),
         };
 
-        let target_data = CollectionIndexPair::new(target_data, self.target_index);
-        let source_data = CollectionIndexPair::new(registers.clone(), self.source_index);
+        let target_data = target_data.get_slice(self.target_index, None);
+        let source_data = registers.get_mut_slice(self.source_index, None);
 
         let data = [source_data, target_data];
         data

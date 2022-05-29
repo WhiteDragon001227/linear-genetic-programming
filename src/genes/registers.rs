@@ -1,5 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
+use more_asserts::assert_le;
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -37,8 +41,30 @@ impl Registers {
         internal_values[index] = value
     }
 
-    pub fn get_value_at_index(&self, index: usize) -> RegisterValue {
+    pub fn get(&self, index: usize) -> RegisterValue {
         self.0[index]
+    }
+
+    pub fn get_mut_slice(&self, start: usize, end: Option<usize>) -> &mut [RegisterValue] {
+        let range = Range {
+            start,
+            end: end.unwrap_or(start + 1),
+        };
+
+        assert_le!(range.end, self.0.len());
+
+        &mut self.0[range]
+    }
+
+    pub fn get_slice(&self, start: usize, end: Option<usize>) -> &[RegisterValue] {
+        let range = Range {
+            start,
+            end: end.unwrap_or(start + 1),
+        };
+
+        assert_le!(range.end, self.0.len());
+
+        &self.0[range]
     }
 
     pub fn argmax(&self, n_classes: usize, desired_index: usize) -> Option<usize> {

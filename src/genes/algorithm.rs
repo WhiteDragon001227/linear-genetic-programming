@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use csv::ReaderBuilder;
+use more_asserts::assert_le;
+use rand::prelude::IteratorRandom;
 
 use crate::utils::alias::{Executables, Inputs};
 
@@ -59,14 +61,58 @@ where
         population
     }
 
-    fn evaluate<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T>;
+    fn evaluate<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T> {
+        for individual in population.get_mut_pop() {
+            individual.lazy_retrieve_fitness();
+        }
 
-    fn rank<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T>;
+        population
+    }
 
-    fn apply_selection<'a, T: Organism>(population: &'a mut Population<T>)
-        -> &'a mut Population<T>;
+    fn rank<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T> {
+        population.sort();
+        population
+    }
 
-    fn breed<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T>;
+    fn apply_selection<'a, T: Organism>(
+        population: &'a mut Population<T>,
+        gap: f32,
+    ) -> &'a mut Population<T> {
+        assert!(gap >= 0f32 && gap <= 1f32);
+
+        assert_le!(
+            population.first().unwrap().lazy_retrieve_fitness(),
+            population.last().unwrap().lazy_retrieve_fitness()
+        );
+
+        let pop_len = population.len();
+
+        let lowest_index = ((1f32 - gap) * (pop_len as f32)).floor() as i32 as usize;
+
+        for _ in 0..lowest_index {
+            population.f_pop();
+        }
+
+        population
+    }
+
+    fn breed<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T> {
+        let pop_cap = population.capacity();
+        let pop_len = population.len();
+        let remaining_size = pop_cap - pop_len;
+
+        let selected_individuals: Vec<T> = population
+            .get_pop()
+            .iter()
+            .cloned()
+            .choose_multiple(&mut rand::thread_rng(), remaining_size);
+
+        for individual in selected_individuals {
+            population.push(individual)
+        }
+
+        population
+    }
 
     fn execute(data: &impl Into<PathBuf>) -> () {}
 }

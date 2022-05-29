@@ -349,66 +349,6 @@ mod iris_impl {
         }
     }
 
-    impl GeneticAlgorithm for IrisLinearGeneticProgramming {
-        type InputType = IrisInput;
-
-        fn evaluate(&mut self) -> &mut Self {
-            for individual in self.population.get_mut_pop() {
-                individual.fitness = match individual.fitness {
-                    None => Some(individual.eval_fitness()),
-                    Some(fitness) => Some(fitness),
-                }
-            }
-
-            self
-        }
-
-        fn apply_selection(&mut self) -> &mut Self {
-            let HyperParameters { gap, .. } = self.hyper_params;
-
-            assert!(gap >= 0f32 && gap <= 1f32);
-
-            assert_le!(
-                self.population.first().unwrap().fitness,
-                self.population.last().unwrap().fitness
-            );
-
-            let pop_len = self.population.len();
-
-            let lowest_index = ((1f32 - gap) * (pop_len as f32)).floor() as i32 as usize;
-
-            for _ in 0..lowest_index {
-                self.population.f_pop();
-            }
-
-            self
-        }
-
-        fn breed(&mut self) -> &mut Self {
-            let Self { population, .. } = self;
-            let pop_cap = population.capacity();
-            let pop_len = population.len();
-            let remaining_size = pop_cap - pop_len;
-
-            let selected_individuals: Vec<Program<'a, Self::InputType>> = population
-                .get_pop()
-                .iter()
-                .cloned()
-                .choose_multiple(&mut rand::thread_rng(), remaining_size);
-
-            for individual in selected_individuals {
-                population.push(individual)
-            }
-
-            self
-        }
-
-        fn rank(&mut self) -> &mut Self {
-            self.population.sort();
-            self
-        }
-    }
-
     impl<'a> Program<'a, IrisInput> {
         pub fn generate(
             inputs: &'a Inputs<IrisInput>,
@@ -435,7 +375,7 @@ mod iris_impl {
     }
 
     impl<'a> Fitness for Program<'a, IrisInput> {
-        fn eval(&self) -> FitnessScore {
+        fn retrieve_fitness(&self) -> FitnessScore {
             let inputs = self.inputs;
 
             let mut fitness = Accuracy::<Option<usize>>::new();
@@ -460,6 +400,10 @@ mod iris_impl {
             let fitness_score = fitness.calculate();
 
             fitness_score
+        }
+
+        fn lazy_retrieve_fitness(&mut self) -> () {
+            todo!()
         }
     }
 }
