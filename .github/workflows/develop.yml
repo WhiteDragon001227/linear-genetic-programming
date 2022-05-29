@@ -1,5 +1,8 @@
 name: develop
-on: [push]
+on: 
+  push:
+    paths:
+      - "src/**.rs"
 jobs:
   test:
     name: Execute Tests 
