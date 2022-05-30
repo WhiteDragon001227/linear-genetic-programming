@@ -9,13 +9,8 @@ mod iris_ops {
     executable!(subtract, -);
     executable!(divide, /, OrderedFloat(2f64));
 
-    executables!(
-        IRIS_EXECUTABLES,
-        self::add,
-        self::subtract,
-        self::divide,
-        self::multiply
-    );
+    pub const IRIS_EXECUTABLES: &[AnyExecutable] =
+        executables!(self::add, self::subtract, self::divide, self::multiply);
 }
 
 #[cfg(test)]
@@ -289,36 +284,6 @@ mod iris_tests {
         assert_ne!(inputs.len(), 0);
         Ok(())
     }
-}
-
-mod iris_impl {
-
-    // impl<'a> Benchmark for IrisLinearGeneticProgramming {
-    //     type InputType = FitnessScore;
-
-    //     fn get_worst(&self) -> Option<Self::InputType> {
-    //         match self.population.first() {
-    //             Some(&Program { fitness, .. }) => fitness,
-    //             _ => None,
-    //         }
-    //     }
-
-    //     fn get_median(&self) -> Option<Self::InputType> {
-    //         match self.population.middle() {
-    //             Some(&Program { fitness, .. }) => fitness,
-    //             _ => None,
-    //         }
-    //     }
-
-    //     fn get_best(&self) -> Option<Self::InputType> {
-    //         match self.population.last() {
-    //             Some(&Program { fitness, .. }) => fitness,
-    //             _ => None,
-    //         }
-    //     }
-    // }
-
-    // TODO: Make default implementation
 }
 
 pub mod iris_data {

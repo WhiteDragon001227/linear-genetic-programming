@@ -28,11 +28,11 @@ macro_rules! executable {
 
 #[macro_export]
 macro_rules! executables {
-    ($const_name: ident, $($fn_tail: path),*) => {
-        pub const $const_name: &'static [AnyExecutable] = &[
+    ($($fn_tail: path),*) => {
+         &[
             $(
                 AnyExecutable(stringify!($fn_tail), $fn_tail),
             )*
-        ];
+        ] as &'static [AnyExecutable]
     };
 }
