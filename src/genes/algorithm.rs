@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, path::PathBuf};
+use std::path::PathBuf;
 
 use csv::ReaderBuilder;
 use more_asserts::assert_le;
@@ -6,19 +6,24 @@ use rand::prelude::IteratorRandom;
 
 use crate::utils::alias::{Executables, Inputs};
 
-use super::{characteristics::Organism, population::Population, registers::ValidInput};
+use super::{
+    characteristics::Organism, population::Population, program::ProgramGenerateParams,
+    registers::ValidInput,
+};
 
 #[derive(Clone)]
-pub struct HyperParameters<T = String>
+pub struct HyperParameters<'a, InputType, DataPathType = String>
 where
-    T: Into<PathBuf>,
+    DataPathType: Into<PathBuf>,
+    InputType: ValidInput,
 {
     pub population_size: usize,
     pub max_program_size: usize,
     pub gap: f32,
     pub max_generations: usize,
-    pub data_path: T,
+    pub data_path: DataPathType,
     pub executables: Executables,
+    pub program_params: ProgramGenerateParams<'a, InputType>,
 }
 
 pub trait GeneticAlgorithm<'a>
@@ -37,7 +42,7 @@ where
             .from_path(file_path.into())
             .unwrap();
 
-        let inputs: Vec<Self::InputType> = vec![];
+        let mut inputs: Vec<Self::InputType> = vec![];
 
         for input in csv_reader.deserialize() {
             let record: Self::InputType = input.unwrap();
@@ -48,9 +53,8 @@ where
     }
 
     fn init_population<T>(
-        hyper_params: &HyperParameters,
+        hyper_params: &HyperParameters<Self::InputType>,
         inputs: &Inputs<Self::InputType>,
-        program_params: T::GenerateParamsType,
     ) -> Population<T>
     where
         T: Organism,
@@ -58,7 +62,7 @@ where
         let mut population: Population<T> = Population::new(hyper_params.population_size);
 
         for _ in 0..hyper_params.population_size {
-            let program = T::generate(Some(program_params));
+            let program = T::generate(Some(&hyper_params.program_params));
             population.push(program)
         }
 
@@ -67,7 +71,7 @@ where
 
     fn evaluate<'b, T: Organism>(population: &'b mut Population<T>) -> &'b mut Population<T> {
         for individual in population.get_mut_pop() {
-            individual.lazy_retrieve_fitness();
+            individual.lazy_fitness();
         }
 
         population
@@ -85,8 +89,8 @@ where
         assert!(gap >= 0f32 && gap <= 1f32);
 
         assert_le!(
-            population.first().unwrap().lazy_retrieve_fitness(),
-            population.last().unwrap().lazy_retrieve_fitness()
+            population.first().unwrap().fitness(),
+            population.last().unwrap().fitness()
         );
 
         let pop_len = population.len();
@@ -121,7 +125,7 @@ where
     fn execute<T>(
         data_path: &impl Into<PathBuf>,
         program_params: T::GenerateParamsType,
-        hyper_params: &HyperParameters,
+        hyper_params: &HyperParameters<Self::InputType>,
     ) -> ()
     where
         T: Organism,

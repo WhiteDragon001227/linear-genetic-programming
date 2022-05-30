@@ -45,7 +45,7 @@ impl Registers {
         self.0[index]
     }
 
-    pub fn get_mut_slice(&self, start: usize, end: Option<usize>) -> &mut [RegisterValue] {
+    pub fn get_mut_slice(&mut self, start: usize, end: Option<usize>) -> &mut [RegisterValue] {
         let range = Range {
             start,
             end: end.unwrap_or(start + 1),
@@ -94,7 +94,11 @@ impl Registers {
     }
 }
 
-pub trait ValidInput: Into<Registers> + Clone + Compare + Show + DeserializeOwned {
+pub trait ValidInput: Clone + Compare + Show + DeserializeOwned {
     const N_CLASSES: usize;
     const N_FEATURES: usize;
+
+    fn get_class(&self) -> usize;
+
+    fn as_registers<'a>(&'a self) -> &'a Registers;
 }

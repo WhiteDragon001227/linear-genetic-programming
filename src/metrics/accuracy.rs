@@ -6,7 +6,7 @@ use crate::utils::alias::Compare;
 
 use super::definitions::Metric;
 
-type ComparablePair<K> = [K; 2];
+pub type ComparablePair<K> = [K; 2];
 
 struct RunningCounter(usize, usize);
 

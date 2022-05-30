@@ -1,42 +1,20 @@
-#[macro_export]
-macro_rules! executable {
-    ( $fn_name: ident,  $op: tt, $val: expr) => {
-        fn $fn_name<'r>(registers: &'r mut [RegisterValue], data: &[RegisterValue]) -> &'r [RegisterValue] {
-            assert_eq!(registers.len(), data.len());
-
-            for index in 0..registers.len() {
-                registers[index] = registers[index] $op $val
-            }
-
-            return registers;
-        }
-    };
-
-    ( $fn_name: ident, $op: tt) => {
-        fn $fn_name<'r>(registers: &'r mut [RegisterValue], data: &[RegisterValue]) -> &'r [RegisterValue] {
-            assert_eq!(registers.len(), data.len());
-
-            for index in 0..registers.len() {
-                registers[index] = registers[index] $op data[index]
-            }
-
-            return registers;
-        }
-    };
-
-}
 mod iris_ops {
+    use crate::genes::registers::RegisterValue;
     use ordered_float::OrderedFloat;
 
-    use crate::{genes::registers::RegisterValue, utils::alias::AnyExecutable};
+    use crate::{executable, utils::alias::AnyExecutable};
 
     executable!(add, +);
     executable!(multiply, *);
     executable!(subtract, -);
     executable!(divide, /, OrderedFloat(2f64));
 
-    pub const IRIS_EXECUTABLES: &'static [AnyExecutable] =
-        &[self::add, self::subtract, self::divide, self::multiply];
+    pub const IRIS_EXECUTABLES: &'static [AnyExecutable] = &[
+        AnyExecutable::new("add", self::add),
+        AnyExecutable::new("subtract", self::subtract),
+        AnyExecutable::new("divide", self::divide),
+        AnyExecutable::new("multiply", self::multiply),
+    ];
 }
 
 #[cfg(test)]
@@ -247,8 +225,8 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            executables: todo!(),
-            data_path: todo!(),
+            executables: IRIS_EXECUTABLES,
+            data_path: tmp_file.path(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -300,24 +278,10 @@ mod iris_tests {
 }
 
 mod iris_impl {
-    use rand::distributions::uniform::{UniformInt, UniformSampler};
-    use strum::EnumCount;
 
-    use crate::{
-        genes::{
-            characteristics::{Fitness, FitnessScore, Generate, Organism},
-            chromosomes::Instruction,
-            program::Program,
-            registers::Registers,
-        },
-        metrics::{accuracy::Accuracy, definitions::Metric},
-        utils::{
-            alias::{AnyExecutable, Inputs},
-            random::GENERATOR,
-        },
-    };
+    use crate::genes::{characteristics::Organism, program::Program, registers::ValidInput};
 
-    use super::iris_data::{IrisClass, IrisInput};
+    use super::iris_data::IrisInput;
 
     // impl<'a> Benchmark for IrisLinearGeneticProgramming {
     //     type InputType = FitnessScore;
@@ -344,41 +308,7 @@ mod iris_impl {
     //     }
     // }
 
-    impl<'a> Organism for Program<'a, IrisInput> {}
-
     // TODO: Make default implementation
-    impl<'a> Fitness for Program<'a, IrisInput> {
-        fn retrieve_fitness(&self) -> FitnessScore {
-            let inputs = self.inputs;
-
-            let mut fitness: Accuracy<Option<usize>> = Accuracy::new();
-
-            for input in inputs {
-                let mut registers = self.registers.clone();
-
-                for instruction in &self.instructions {
-                    let target_data = instruction.get_data(&mut registers, input);
-                    let register_slice = registers.get_mut_slice(instruction.source_index, None);
-                    (instruction.exec)(register_slice, target_data);
-                }
-
-                let correct_index = input.class as usize;
-                let registers_argmax = registers.argmax(IrisClass::COUNT, correct_index);
-
-                fitness.observe([registers_argmax, Some(correct_index)]);
-
-                registers.reset();
-            }
-
-            let fitness_score = fitness.calculate();
-
-            fitness_score
-        }
-
-        fn lazy_retrieve_fitness(&mut self) -> () {
-            todo!()
-        }
-    }
 }
 
 pub mod iris_data {
@@ -431,7 +361,7 @@ pub mod iris_data {
         sepal_width: RegisterValue,
         petal_length: RegisterValue,
         petal_width: RegisterValue,
-        pub class: IrisClass,
+        class: IrisClass,
     }
 
     impl Display for IrisInput {
@@ -441,19 +371,21 @@ pub mod iris_data {
         }
     }
 
-    impl Into<Registers> for IrisInput {
-        fn into(self) -> Registers {
-            return Registers::from(vec![
-                self.sepal_length,
-                self.sepal_width,
-                self.petal_length,
-                self.petal_width,
-            ]);
-        }
-    }
-
     impl ValidInput for IrisInput {
         const N_CLASSES: usize = 3;
         const N_FEATURES: usize = 4;
+
+        fn get_class(&self) -> usize {
+            self.class as usize
+        }
+
+        fn as_registers<'a>(&'a self) -> &'a Registers {
+            return &Registers::from(vec![
+                self.sepal_length,
+                self.sepal_width,
+                self.petal_length,
+                self.petal_length,
+            ]);
+        }
     }
 }

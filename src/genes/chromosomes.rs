@@ -13,7 +13,7 @@ use crate::utils::alias::{AnyExecutable, Executables};
 use crate::utils::random::GENERATOR;
 
 use super::characteristics::Generate;
-use super::registers::{RegisterValue, Registers, ValidInput};
+use super::registers::{Registers, ValidInput};
 
 #[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq, Serialize)]
 pub enum Modes {
@@ -36,7 +36,7 @@ impl Distribution<Modes> for Standard {
 #[derive(Clone, Serialize)]
 pub struct Instruction {
     pub source_index: usize,
-    target_index: usize,
+    pub target_index: usize,
     mode: Modes,
     #[serde(skip_serializing)]
     pub exec: AnyExecutable,
@@ -76,9 +76,19 @@ impl Generate for Instruction {
     }
 }
 pub struct InstructionGenerateParams {
-    pub registers_len: usize,
-    pub data_len: usize,
-    pub executables: Executables,
+    registers_len: usize,
+    data_len: usize,
+    executables: Executables,
+}
+
+impl InstructionGenerateParams {
+    pub fn new(registers_len: usize, data_len: usize, executables: Executables) -> Option<Self> {
+        Some(InstructionGenerateParams {
+            registers_len,
+            data_len,
+            executables,
+        })
+    }
 }
 
 impl Eq for Instruction {}
@@ -88,7 +98,7 @@ impl PartialEq for Instruction {
         self.source_index == other.source_index
             && self.target_index == other.target_index
             && self.mode == other.mode
-            && self.exec as usize == other.exec as usize
+            && self.exec.get_fn() as usize == other.exec.get_fn() as usize
     }
 }
 
@@ -107,17 +117,15 @@ impl Instruction {
         &self,
         registers: &'a Registers,
         data: &'a InputType,
-    ) -> &'a [RegisterValue]
+    ) -> Registers
     where
         InputType: ValidInput,
     {
-        let target_data: &Registers = match self.mode {
-            Modes::Registers => &registers,
-            Modes::Input => &data.clone().into(),
+        let target_data: Registers = match self.mode {
+            Modes::Registers => registers.clone(),
+            Modes::Input => data.as_registers().clone(),
         };
 
-        let target_slice = target_data.get_slice(self.target_index, None);
-
-        target_slice
+        target_data
     }
 }

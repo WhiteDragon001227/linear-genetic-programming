@@ -3,9 +3,10 @@ use crate::utils::alias::{Compare, Show};
 use super::{chromosomes::Instruction, registers::RegisterValue};
 
 pub type FitnessScore = RegisterValue;
+
 pub trait Fitness: Show {
-    fn retrieve_fitness(&self) -> FitnessScore;
-    fn lazy_retrieve_fitness(&mut self) -> ();
+    fn fitness(&self) -> FitnessScore;
+    fn lazy_fitness(&mut self) -> FitnessScore;
 }
 
 pub trait Breed: Show {
@@ -18,12 +19,8 @@ pub trait Mutate: Show {
 
 pub trait Generate {
     type GenerateParamsType;
-    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self;
-}
 
-pub trait Meta {
-    fn get_number_of_features() -> usize;
-    fn get_number_of_classes() -> usize;
+    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self;
 }
 
 pub trait Organism: Fitness + Generate + Compare {

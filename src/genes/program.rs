@@ -1,16 +1,20 @@
 use std::fmt::Display;
 
+use crate::metrics::definitions::Metric;
 use rand::distributions::uniform::{UniformInt, UniformSampler};
 use serde::Serialize;
 
-use crate::utils::{
-    alias::{Executables, Inputs},
-    random::GENERATOR,
+use crate::{
+    metrics::accuracy::Accuracy,
+    utils::{
+        alias::{Executables, Inputs},
+        random::GENERATOR,
+    },
 };
 
 use super::{
-    characteristics::{FitnessScore, Generate},
-    chromosomes::Instruction,
+    characteristics::{Fitness, FitnessScore, Generate, Organism},
+    chromosomes::{Instruction, InstructionGenerateParams},
     registers::{Registers, ValidInput},
 };
 
@@ -22,9 +26,10 @@ where
     pub instructions: Vec<Instruction>,
     pub inputs: &'a Inputs<InputType>,
     pub registers: Registers,
-    pub fitness: Option<FitnessScore>,
+    fitness: Option<FitnessScore>,
 }
 
+#[derive(Clone, Debug)]
 pub struct ProgramGenerateParams<'a, InputType>
 where
     InputType: ValidInput,
@@ -80,7 +85,13 @@ where
         let n_instructions = UniformInt::<usize>::new(0, max_instructions).sample(GENERATOR);
 
         let instructions: Vec<Instruction> = (0..n_instructions)
-            .map(|_| Instruction::generate(InputType::N_CLASSES, InputType::N_CLASSES, executables))
+            .map(|_| {
+                Instruction::generate(InstructionGenerateParams::new(
+                    InputType::N_CLASSES,
+                    InputType::N_FEATURES,
+                    executables,
+                ))
+            })
             .collect();
 
         Program {
@@ -89,5 +100,49 @@ where
             inputs,
             fitness: None,
         }
+    }
+}
+
+impl<'a, InputType> Fitness for Program<'a, InputType>
+where
+    InputType: ValidInput,
+{
+    fn fitness(&self) -> FitnessScore {
+        let inputs = self.inputs;
+
+        let mut fitness: Accuracy<Option<usize>> = Accuracy::new();
+
+        for input in inputs {
+            let mut registers = self.registers.clone();
+
+            for instruction in &self.instructions {
+                let data = instruction.get_data(&registers, input);
+                let input_slice = data.get_slice(instruction.target_index, None);
+                let register_slice = registers.get_mut_slice(instruction.source_index, None);
+                (instruction.exec)(register_slice, input_slice);
+            }
+
+            let correct_index = input.get_class();
+            let registers_argmax = registers.argmax(InputType::N_CLASSES, correct_index);
+
+            Accuracy::observe(&mut fitness, [registers_argmax, Some(correct_index)]);
+
+            registers.reset();
+        }
+
+        fitness.calculate()
+    }
+
+    fn lazy_fitness(&mut self) -> FitnessScore {
+        *self.fitness.get_or_insert(self.fitness())
+    }
+}
+
+impl<'a, InputType> Organism for Program<'a, InputType>
+where
+    InputType: ValidInput,
+{
+    fn get_instructions(&self) -> &[crate::genes::chromosomes::Instruction] {
+        &self.instructions
     }
 }
