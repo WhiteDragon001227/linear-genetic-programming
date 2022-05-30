@@ -94,4 +94,7 @@ impl Registers {
     }
 }
 
-pub trait ValidInput = Into<Registers> + Clone + Compare + Show + DeserializeOwned;
+pub trait ValidInput: Into<Registers> + Clone + Compare + Show + DeserializeOwned {
+    const N_CLASSES: usize;
+    const N_FEATURES: usize;
+}

@@ -1,6 +1,5 @@
 use core::fmt;
 use std::fmt::Display;
-use std::hash::Hash;
 
 use serde::Serialize;
 
@@ -11,7 +10,7 @@ pub type AnyExecutable =
 
 pub type Executables = &'static [AnyExecutable];
 
-pub trait Compare<V = Self> = PartialEq<V> + Eq + PartialOrd + Ord + Hash where V: Clone;
+pub trait Compare<V = Self> = PartialEq<V> + Eq + PartialOrd + Ord where V: Clone;
 pub trait Show = fmt::Debug + Display + Serialize;
 
 pub type Inputs<InputType> = Vec<InputType>;

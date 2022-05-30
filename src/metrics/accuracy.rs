@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
@@ -32,7 +32,7 @@ struct OccuranceCounter<T>(RunningCounter, PhantomData<T>);
 
 impl<K> OccuranceCounter<K>
 where
-    K: Compare,
+    K: Compare + Hash,
 {
     fn new() -> Self {
         OccuranceCounter(RunningCounter(0, 0), PhantomData)
@@ -41,7 +41,7 @@ where
 
 impl<K> Metric for OccuranceCounter<K>
 where
-    K: Compare,
+    K: Compare + Hash,
 {
     type ObservableType = ComparablePair<K>;
     type ResultType = [usize; 2];
@@ -62,20 +62,20 @@ where
 
 pub struct Accuracy<K>(HashMap<K, OccuranceCounter<K>>)
 where
-    K: Compare;
+    K: Compare + Hash;
 
 impl<K> Accuracy<K>
 where
-    K: Compare,
+    K: Compare + Hash,
 {
     pub fn new() -> Self {
-        Accuracy(HashMap::new())
+        Accuracy(HashMap::<K, OccuranceCounter<K>>::new())
     }
 }
 
 impl<K> Metric for Accuracy<K>
 where
-    K: Compare,
+    K: Compare + Hash,
 {
     type ObservableType = ComparablePair<K>;
     type ResultType = OrderedFloat<f64>;

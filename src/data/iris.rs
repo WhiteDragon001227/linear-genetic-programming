@@ -35,7 +35,7 @@ mod iris_ops {
     executable!(subtract, -);
     executable!(divide, /, OrderedFloat(2f64));
 
-    pub const EXECUTABLES: &'static [AnyExecutable] =
+    pub const IRIS_EXECUTABLES: &'static [AnyExecutable] =
         &[self::add, self::subtract, self::divide, self::multiply];
 }
 
@@ -44,7 +44,7 @@ mod iris_tests {
     use std::error;
 
     use crate::{
-        data::iris::iris_data::IrisInput,
+        data::iris::{iris_data::IrisInput, iris_ops::IRIS_EXECUTABLES},
         genes::{
             algorithm::{GeneticAlgorithm, HyperParameters},
             characteristics::FitnessScore,
@@ -74,7 +74,8 @@ mod iris_tests {
             max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            executables: todo!(),
+            executables: IRIS_EXECUTABLES,
+            data_path: tmp_file.path(),
         };
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
@@ -187,6 +188,7 @@ mod iris_tests {
             gap: 0.5,
             max_generations: 100,
             executables: todo!(),
+            data_path: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -217,6 +219,7 @@ mod iris_tests {
             gap: 0.5,
             max_generations: 100,
             executables: todo!(),
+            data_path: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -245,6 +248,7 @@ mod iris_tests {
             gap: 0.5,
             max_generations: 100,
             executables: todo!(),
+            data_path: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -296,100 +300,66 @@ mod iris_tests {
 }
 
 mod iris_impl {
-    use std::{collections::VecDeque, path::PathBuf};
-
-    use csv::ReaderBuilder;
-
-    use more_asserts::assert_le;
-    use rand::{
-        distributions::uniform::{UniformInt, UniformSampler},
-        prelude::IteratorRandom,
-    };
+    use rand::distributions::uniform::{UniformInt, UniformSampler};
     use strum::EnumCount;
 
     use crate::{
         genes::{
-            algorithm::{GeneticAlgorithm, HyperParameters},
-            characteristics::{Fitness, FitnessScore},
+            characteristics::{Fitness, FitnessScore, Generate, Organism},
             chromosomes::Instruction,
             program::Program,
             registers::Registers,
         },
-        metrics::{accuracy::Accuracy, benchmarks::Benchmark},
+        metrics::{accuracy::Accuracy, definitions::Metric},
         utils::{
             alias::{AnyExecutable, Inputs},
             random::GENERATOR,
         },
     };
 
-    use super::{
-        iris_data::{IrisClass, IrisInput, IrisLinearGeneticProgramming},
-        iris_ops,
-    };
+    use super::iris_data::{IrisClass, IrisInput};
 
-    impl<'a> Benchmark for IrisLinearGeneticProgramming {
-        type InputType = FitnessScore;
+    // impl<'a> Benchmark for IrisLinearGeneticProgramming {
+    //     type InputType = FitnessScore;
 
-        fn get_worst(&self) -> Option<Self::InputType> {
-            match self.population.first() {
-                Some(&Program { fitness, .. }) => fitness,
-                _ => None,
-            }
-        }
+    //     fn get_worst(&self) -> Option<Self::InputType> {
+    //         match self.population.first() {
+    //             Some(&Program { fitness, .. }) => fitness,
+    //             _ => None,
+    //         }
+    //     }
 
-        fn get_median(&self) -> Option<Self::InputType> {
-            match self.population.middle() {
-                Some(&Program { fitness, .. }) => fitness,
-                _ => None,
-            }
-        }
+    //     fn get_median(&self) -> Option<Self::InputType> {
+    //         match self.population.middle() {
+    //             Some(&Program { fitness, .. }) => fitness,
+    //             _ => None,
+    //         }
+    //     }
 
-        fn get_best(&self) -> Option<Self::InputType> {
-            match self.population.last() {
-                Some(&Program { fitness, .. }) => fitness,
-                _ => None,
-            }
-        }
-    }
+    //     fn get_best(&self) -> Option<Self::InputType> {
+    //         match self.population.last() {
+    //             Some(&Program { fitness, .. }) => fitness,
+    //             _ => None,
+    //         }
+    //     }
+    // }
 
-    impl<'a> Program<'a, IrisInput> {
-        pub fn generate(
-            inputs: &'a Inputs<IrisInput>,
-            max_instructions: usize,
-            executables: &[AnyExecutable],
-        ) -> Self {
-            let register_len = 4;
-            let input_len = 4;
-            let registers = Registers::new(register_len);
+    impl<'a> Organism for Program<'a, IrisInput> {}
 
-            let n_instructions = UniformInt::<usize>::new(0, max_instructions).sample(GENERATOR);
-
-            let instructions: Vec<Instruction> = (0..n_instructions)
-                .map(|_| Instruction::generate(register_len, input_len, executables))
-                .collect();
-
-            Program {
-                instructions,
-                registers,
-                inputs,
-                fitness: None,
-            }
-        }
-    }
-
+    // TODO: Make default implementation
     impl<'a> Fitness for Program<'a, IrisInput> {
         fn retrieve_fitness(&self) -> FitnessScore {
             let inputs = self.inputs;
 
-            let mut fitness = Accuracy::<Option<usize>>::new();
+            let mut fitness: Accuracy<Option<usize>> = Accuracy::new();
 
             for input in inputs {
                 let mut registers = self.registers.clone();
 
                 for instruction in &self.instructions {
-                    let [source_data, target_data] = instruction.get_data(&registers, input);
-
-                    instruction.apply(&mut registers, source_data, target_data);
+                    let target_data = instruction.get_data(&mut registers, input);
+                    let register_slice = registers.get_mut_slice(instruction.source_index, None);
+                    (instruction.exec)(register_slice, target_data);
                 }
 
                 let correct_index = input.class as usize;
@@ -420,7 +390,7 @@ pub mod iris_data {
 
     use crate::genes::{
         algorithm::GeneticAlgorithm,
-        registers::{RegisterValue, Registers},
+        registers::{RegisterValue, Registers, ValidInput},
     };
 
     pub const IRIS_DATASET_LINK: &'static str =
@@ -451,7 +421,7 @@ pub mod iris_data {
 
     pub struct IrisLinearGeneticProgramming;
 
-    impl GeneticAlgorithm for IrisLinearGeneticProgramming {
+    impl<'a> GeneticAlgorithm<'a> for IrisLinearGeneticProgramming {
         type InputType = IrisInput;
     }
 
@@ -480,5 +450,10 @@ pub mod iris_data {
                 self.petal_width,
             ]);
         }
+    }
+
+    impl ValidInput for IrisInput {
+        const N_CLASSES: usize = 3;
+        const N_FEATURES: usize = 4;
     }
 }

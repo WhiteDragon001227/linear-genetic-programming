@@ -26,6 +26,6 @@ pub trait Meta {
     fn get_number_of_classes() -> usize;
 }
 
-pub trait Organism: Fitness + Breed + Mutate + Generate + Compare {
+pub trait Organism: Fitness + Generate + Compare {
     fn get_instructions(&self) -> &[Instruction];
 }

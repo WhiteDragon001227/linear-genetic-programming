@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{cmp::Ordering, path::PathBuf};
 
 use csv::ReaderBuilder;
 use more_asserts::assert_le;
@@ -9,15 +9,19 @@ use crate::utils::alias::{Executables, Inputs};
 use super::{characteristics::Organism, population::Population, registers::ValidInput};
 
 #[derive(Clone)]
-pub struct HyperParameters {
+pub struct HyperParameters<T = String>
+where
+    T: Into<PathBuf>,
+{
     pub population_size: usize,
     pub max_program_size: usize,
     pub gap: f32,
     pub max_generations: usize,
+    pub data_path: T,
     pub executables: Executables,
 }
 
-pub trait GeneticAlgorithm
+pub trait GeneticAlgorithm<'a>
 where
     Self::InputType: ValidInput,
 {
@@ -43,7 +47,7 @@ where
         inputs
     }
 
-    fn init_population<'a, T>(
+    fn init_population<T>(
         hyper_params: &HyperParameters,
         inputs: &Inputs<Self::InputType>,
         program_params: T::GenerateParamsType,
@@ -61,7 +65,7 @@ where
         population
     }
 
-    fn evaluate<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T> {
+    fn evaluate<'b, T: Organism>(population: &'b mut Population<T>) -> &'b mut Population<T> {
         for individual in population.get_mut_pop() {
             individual.lazy_retrieve_fitness();
         }
@@ -69,15 +73,15 @@ where
         population
     }
 
-    fn rank<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T> {
+    fn rank<'b, T: Organism>(population: &'b mut Population<T>) -> &'b mut Population<T> {
         population.sort();
         population
     }
 
-    fn apply_selection<'a, T: Organism>(
-        population: &'a mut Population<T>,
+    fn apply_selection<'b, T: Organism>(
+        population: &'b mut Population<T>,
         gap: f32,
-    ) -> &'a mut Population<T> {
+    ) -> &'b mut Population<T> {
         assert!(gap >= 0f32 && gap <= 1f32);
 
         assert_le!(
@@ -96,7 +100,7 @@ where
         population
     }
 
-    fn breed<'a, T: Organism>(population: &'a mut Population<T>) -> &'a mut Population<T> {
+    fn breed<'b, T: Organism>(population: &'b mut Population<T>) -> &'b mut Population<T> {
         let pop_cap = population.capacity();
         let pop_len = population.len();
         let remaining_size = pop_cap - pop_len;
@@ -114,5 +118,13 @@ where
         population
     }
 
-    fn execute(data: &impl Into<PathBuf>) -> () {}
+    fn execute<T>(
+        data_path: &impl Into<PathBuf>,
+        program_params: T::GenerateParamsType,
+        hyper_params: &HyperParameters,
+    ) -> ()
+    where
+        T: Organism,
+    {
+    }
 }

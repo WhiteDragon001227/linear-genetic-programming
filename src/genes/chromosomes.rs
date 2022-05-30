@@ -12,6 +12,7 @@ use strum::EnumCount;
 use crate::utils::alias::{AnyExecutable, Executables};
 use crate::utils::random::GENERATOR;
 
+use super::characteristics::Generate;
 use super::registers::{RegisterValue, Registers, ValidInput};
 
 #[derive(FromPrimitive, Clone, Debug, EnumCount, PartialEq, Eq, Serialize)]
@@ -34,11 +35,50 @@ impl Distribution<Modes> for Standard {
 
 #[derive(Clone, Serialize)]
 pub struct Instruction {
-    source_index: usize,
+    pub source_index: usize,
     target_index: usize,
     mode: Modes,
     #[serde(skip_serializing)]
-    exec: AnyExecutable,
+    pub exec: AnyExecutable,
+}
+
+impl Generate for Instruction {
+    type GenerateParamsType = InstructionGenerateParams;
+
+    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self {
+        assert!(parameters.is_some());
+
+        let InstructionGenerateParams {
+            data_len,
+            registers_len,
+            executables,
+        } = parameters.unwrap();
+
+        let source_index = UniformInt::<usize>::new(0, registers_len).sample(GENERATOR);
+        let mode = StdRng::from_entropy().sample(Standard);
+        let target_index = UniformInt::<usize>::new(
+            0,
+            if mode == Modes::Input {
+                data_len
+            } else {
+                registers_len
+            },
+        )
+        .sample(&mut thread_rng());
+        let exec = executables.choose(GENERATOR).unwrap();
+
+        Instruction {
+            source_index,
+            target_index,
+            exec: *exec,
+            mode,
+        }
+    }
+}
+pub struct InstructionGenerateParams {
+    pub registers_len: usize,
+    pub data_len: usize,
+    pub executables: Executables,
 }
 
 impl Eq for Instruction {}
@@ -65,49 +105,19 @@ impl Debug for Instruction {
 impl Instruction {
     pub fn get_data<'a, InputType>(
         &self,
-        registers: &'a mut Registers,
+        registers: &'a Registers,
         data: &'a InputType,
-    ) -> [&'a [RegisterValue]; 2]
+    ) -> &'a [RegisterValue]
     where
-        InputType: ValidInput + Clone,
+        InputType: ValidInput,
     {
-        let target_data = match self.mode {
-            Modes::Registers => registers,
-            Modes::Input => todo!(),
+        let target_data: &Registers = match self.mode {
+            Modes::Registers => &registers,
+            Modes::Input => &data.clone().into(),
         };
 
-        let target_data = target_data.get_slice(self.target_index, None);
-        let source_data = registers.get_mut_slice(self.source_index, None);
+        let target_slice = target_data.get_slice(self.target_index, None);
 
-        let data = [source_data, target_data];
-        data
-    }
-
-    pub fn generate(registers_len: usize, data_len: usize, executables: Executables) -> Self {
-        // Sanity check
-        assert!(executables.len() != 0);
-        assert!(registers_len != 0);
-        assert!(data_len != 0);
-
-        let source_index = UniformInt::<usize>::new(0, registers_len).sample(GENERATOR);
-        let mode = StdRng::from_entropy().sample(Standard);
-        let target_index = UniformInt::<usize>::new(
-            0,
-            if mode == Modes::Input {
-                data_len
-            } else {
-                registers_len
-            },
-        )
-        .sample(&mut thread_rng());
-        let exec = executables.choose(GENERATOR).unwrap();
-        // update target index
-
-        Instruction {
-            source_index,
-            target_index,
-            exec: *exec,
-            mode,
-        }
+        target_slice
     }
 }
