@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
-use crate::utils::common_traits::Compare;
+use crate::{genes::registers::RegisterValue, utils::common_traits::Compare};
 
 use super::definitions::Metric;
 
@@ -78,7 +78,7 @@ where
     K: Compare + Hash,
 {
     type ObservableType = ComparablePair<K>;
-    type ResultType = OrderedFloat<f64>;
+    type ResultType = RegisterValue;
 
     fn observe(&mut self, value: Self::ObservableType) {
         let Accuracy(map, ..) = self;
@@ -102,6 +102,6 @@ where
             ]
         });
 
-        OrderedFloat(counter[0] as f64) / OrderedFloat(counter[1] as f64)
+        OrderedFloat(counter[0] as f32) / OrderedFloat(counter[1] as f32)
     }
 }

@@ -9,14 +9,15 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::utils::common_traits::{Compare, Show};
 
-pub type RegisterValue = OrderedFloat<f64>;
+pub type RegisterValue = OrderedFloat<f32>;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub struct Registers(Vec<RegisterValue>);
+pub struct Registers(pub Vec<RegisterValue>);
 
 impl Registers {
     pub fn new(n_registers: usize) -> Registers {
-        Registers(vec![OrderedFloat(0f64); n_registers])
+        let internal_vec = vec![OrderedFloat(0f32); n_registers];
+        Registers(internal_vec)
     }
 
     pub fn from(vec: Vec<RegisterValue>) -> Registers {
@@ -27,7 +28,7 @@ impl Registers {
         let Registers(internal_registers) = self;
 
         for index in 0..internal_registers.len() {
-            internal_registers[index] = OrderedFloat(0f64);
+            internal_registers[index] = OrderedFloat(0f32);
         }
     }
 

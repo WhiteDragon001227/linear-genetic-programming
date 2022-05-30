@@ -14,5 +14,17 @@
       "cwd": "${workspaceFolder}",
       "args": []
     },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Launch",
+      "cargo": {
+        "args": [
+          "run",
+        ]
+      },
+      "cwd": "${workspaceFolder}",
+      "args": []
+    }
   ]
 }

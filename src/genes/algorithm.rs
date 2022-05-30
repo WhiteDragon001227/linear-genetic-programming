@@ -109,5 +109,19 @@ where
         }
     }
 
-    fn execute(hyper_params: &HyperParameters<Self::O>) -> () {}
+    // TODO: Add hooks?
+    fn execute(hyper_params: &HyperParameters<Self::O>) -> Population<Self::O> {
+        Self::init_env();
+
+        let mut population = Self::init_population(hyper_params);
+
+        for _ in 0..hyper_params.max_generations {
+            Self::apply_selection(&mut population, hyper_params.gap);
+            Self::evaluate(&mut population);
+            Self::rank(&mut population);
+            Self::breed(&mut population);
+        }
+
+        population
+    }
 }
