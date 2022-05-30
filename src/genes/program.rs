@@ -73,12 +73,12 @@ where
 {
     type GenerateParamsType = ProgramGenerateParams<'a, InputType>;
 
-    fn generate<'b>(parameters: Option<&'b Self::GenerateParamsType>) -> Self {
+    fn generate<'b>(parameters: &'b Self::GenerateParamsType) -> Self {
         let ProgramGenerateParams {
             max_instructions,
             inputs,
             executables,
-        } = parameters.unwrap();
+        } = parameters;
 
         let registers = Registers::new(InputType::N_CLASSES + 1);
 
@@ -92,7 +92,7 @@ where
         );
 
         let instructions: Vec<Instruction> = (0..n_instructions)
-            .map(|_| Instruction::generate(Some(&instruction_params)))
+            .map(|_| Instruction::generate(&instruction_params))
             .collect();
 
         Program {

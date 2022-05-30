@@ -45,14 +45,12 @@ pub struct Instruction<'a> {
 impl<'b> Generate for Instruction<'b> {
     type GenerateParamsType = InstructionGenerateParams;
 
-    fn generate<'a>(parameters: Option<&'a Self::GenerateParamsType>) -> Self {
-        assert!(parameters.is_some());
-
+    fn generate<'a>(parameters: &'a Self::GenerateParamsType) -> Self {
         let InstructionGenerateParams {
             data_len,
             registers_len,
             executables,
-        } = parameters.unwrap();
+        } = parameters;
 
         let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut GENERATOR::get());
         let mode = StdRng::from_entropy().sample(Standard);

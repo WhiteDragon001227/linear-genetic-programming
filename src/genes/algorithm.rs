@@ -4,7 +4,7 @@ use csv::ReaderBuilder;
 use more_asserts::assert_le;
 use rand::prelude::IteratorRandom;
 
-use crate::utils::common_traits::{Executables, Inputs};
+use crate::utils::common_traits::Inputs;
 
 use super::{characteristics::Organism, population::Population, registers::ValidInput};
 
@@ -19,7 +19,6 @@ where
     pub gap: f32,
     pub max_generations: usize,
     pub data_path: DataPathType,
-    pub executables: Executables,
     pub program_params: OrganismType::GenerateParamsType,
 }
 
@@ -49,17 +48,14 @@ where
         inputs
     }
 
-    fn init_population<T>(
-        hyper_params: &HyperParameters<T>,
-        inputs: &Inputs<Self::InputType>,
-    ) -> Population<T>
+    fn init_population<T>(hyper_params: &HyperParameters<T>) -> Population<T>
     where
         T: Organism,
     {
         let mut population: Population<T> = Population::new(hyper_params.population_size);
 
         for _ in 0..hyper_params.population_size {
-            let program = T::generate(Some(&hyper_params.program_params));
+            let program = T::generate(&hyper_params.program_params);
             population.push(program)
         }
 
@@ -119,11 +115,7 @@ where
         population
     }
 
-    fn execute<T>(
-        data_path: &impl Into<PathBuf>,
-        program_params: T::GenerateParamsType,
-        hyper_params: &HyperParameters<T>,
-    ) -> ()
+    fn execute<T>(hyper_params: &HyperParameters<T>) -> ()
     where
         T: Organism,
     {

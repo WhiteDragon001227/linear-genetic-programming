@@ -20,7 +20,7 @@ pub trait Mutate: Show {
 pub trait Generate {
     type GenerateParamsType;
 
-    fn generate<'a>(parameters: Option<&'a Self::GenerateParamsType>) -> Self;
+    fn generate<'a>(parameters: &'a Self::GenerateParamsType) -> Self;
 }
 
 pub trait Organism: Fitness + Generate + Compare {
