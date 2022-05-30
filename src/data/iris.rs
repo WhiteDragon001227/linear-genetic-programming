@@ -1,20 +1,21 @@
 mod iris_ops {
-    use crate::genes::registers::RegisterValue;
+    use crate::{executables, genes::registers::RegisterValue};
     use ordered_float::OrderedFloat;
 
-    use crate::{executable, utils::alias::AnyExecutable};
+    use crate::{executable, utils::common_traits::AnyExecutable};
 
     executable!(add, +);
     executable!(multiply, *);
     executable!(subtract, -);
     executable!(divide, /, OrderedFloat(2f64));
 
-    pub const IRIS_EXECUTABLES: &'static [AnyExecutable] = &[
-        AnyExecutable::new("add", self::add),
-        AnyExecutable::new("subtract", self::subtract),
-        AnyExecutable::new("divide", self::divide),
-        AnyExecutable::new("multiply", self::multiply),
-    ];
+    executables!(
+        IRIS_EXECUTABLES,
+        self::add,
+        self::subtract,
+        self::divide,
+        self::multiply
+    );
 }
 
 #[cfg(test)]
@@ -54,6 +55,7 @@ mod iris_tests {
             max_generations: 100,
             executables: IRIS_EXECUTABLES,
             data_path: tmp_file.path(),
+            program_params: todo!(),
         };
 
         let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
@@ -167,6 +169,7 @@ mod iris_tests {
             max_generations: 100,
             executables: todo!(),
             data_path: todo!(),
+            program_params: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -198,6 +201,7 @@ mod iris_tests {
             max_generations: 100,
             executables: todo!(),
             data_path: todo!(),
+            program_params: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -227,6 +231,7 @@ mod iris_tests {
             max_generations: 100,
             executables: IRIS_EXECUTABLES,
             data_path: tmp_file.path(),
+            program_params: todo!(),
         };
 
         let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
@@ -278,10 +283,6 @@ mod iris_tests {
 }
 
 mod iris_impl {
-
-    use crate::genes::{characteristics::Organism, program::Program, registers::ValidInput};
-
-    use super::iris_data::IrisInput;
 
     // impl<'a> Benchmark for IrisLinearGeneticProgramming {
     //     type InputType = FitnessScore;
@@ -378,14 +379,16 @@ pub mod iris_data {
         fn get_class(&self) -> usize {
             self.class as usize
         }
+    }
 
-        fn as_registers<'a>(&'a self) -> &'a Registers {
-            return &Registers::from(vec![
-                self.sepal_length,
-                self.sepal_width,
-                self.petal_length,
-                self.petal_length,
-            ]);
+    impl From<IrisInput> for Registers {
+        fn from(input: IrisInput) -> Self {
+            Registers::from(vec![
+                input.sepal_length,
+                input.sepal_width,
+                input.petal_length,
+                input.petal_width,
+            ])
         }
     }
 }

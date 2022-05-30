@@ -1,4 +1,3 @@
-#[macro_use]
 #[macro_export]
 macro_rules! executable {
     ( $fn_name: ident,  $op: tt, $val: expr) => {
@@ -25,4 +24,15 @@ macro_rules! executable {
         }
     };
 
+}
+
+#[macro_export]
+macro_rules! executables {
+    ($const_name: ident, $($fn_tail: path),*) => {
+        pub const $const_name: &'static [AnyExecutable] = &[
+            $(
+                AnyExecutable(stringify!($fn_tail), $fn_tail),
+            )*
+        ];
+    };
 }

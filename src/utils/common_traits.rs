@@ -6,13 +6,9 @@ use serde::Serialize;
 use crate::genes::registers::RegisterValue;
 
 #[derive(Clone)]
-pub struct AnyExecutable(&'static str, InternalFn);
+pub struct AnyExecutable(pub &'static str, pub InternalFn);
 
 impl AnyExecutable {
-    pub fn new(name: &'static str, internal_fn: InternalFn) -> Self {
-        AnyExecutable(name, internal_fn)
-    }
-
     pub fn get_name(&self) -> &'static str {
         &self.0
     }

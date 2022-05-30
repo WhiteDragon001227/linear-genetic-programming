@@ -1,6 +1,6 @@
 use std::{cmp::Reverse, collections::BinaryHeap};
 
-use super::alias::Compare;
+use super::common_traits::Compare;
 
 #[derive(Debug, Clone)]
 pub struct MedianHeap<'a, InputType> {

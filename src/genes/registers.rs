@@ -7,7 +7,7 @@ use more_asserts::assert_le;
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::utils::alias::{Compare, Show};
+use crate::utils::common_traits::{Compare, Show};
 
 pub type RegisterValue = OrderedFloat<f64>;
 
@@ -99,6 +99,4 @@ pub trait ValidInput: Clone + Compare + Show + DeserializeOwned {
     const N_FEATURES: usize;
 
     fn get_class(&self) -> usize;
-
-    fn as_registers<'a>(&'a self) -> &'a Registers;
 }

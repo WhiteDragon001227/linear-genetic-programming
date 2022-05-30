@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::{
     metrics::accuracy::Accuracy,
     utils::{
-        alias::{Executables, Inputs},
+        common_traits::{Executables, Inputs},
         random::GENERATOR,
     },
 };
@@ -73,7 +73,7 @@ where
 {
     type GenerateParamsType = ProgramGenerateParams<'a, InputType>;
 
-    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self {
+    fn generate<'b>(parameters: Option<&'b Self::GenerateParamsType>) -> Self {
         let ProgramGenerateParams {
             max_instructions,
             inputs,
@@ -84,15 +84,13 @@ where
 
         let n_instructions = UniformInt::<usize>::new(0, max_instructions).sample(GENERATOR);
 
-        let instructions: Vec<Instruction> = (0..n_instructions)
-            .map(|_| {
-                Instruction::generate(InstructionGenerateParams::new(
-                    InputType::N_CLASSES,
-                    InputType::N_FEATURES,
-                    executables,
-                ))
-            })
-            .collect();
+        let instruction_params = InstructionGenerateParams::new(
+            InputType::N_CLASSES,
+            InputType::N_FEATURES,
+            executables,
+        );
+
+        let instructions: Vec<Instruction> = (0..n_instructions).map(|_| Instruction::generate(Some(&instruction_params))).collect();
 
         Program {
             instructions,
@@ -119,7 +117,7 @@ where
                 let data = instruction.get_data(&registers, input);
                 let input_slice = data.get_slice(instruction.target_index, None);
                 let register_slice = registers.get_mut_slice(instruction.source_index, None);
-                (instruction.exec)(register_slice, input_slice);
+                (instruction.exec.get_fn())(register_slice, input_slice);
             }
 
             let correct_index = input.get_class();

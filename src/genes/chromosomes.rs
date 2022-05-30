@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use strum::EnumCount;
 
-use crate::utils::alias::{AnyExecutable, Executables};
+use crate::utils::common_traits::{AnyExecutable, Executables};
 use crate::utils::random::GENERATOR;
 
 use super::characteristics::Generate;
@@ -45,7 +45,7 @@ pub struct Instruction {
 impl Generate for Instruction {
     type GenerateParamsType = InstructionGenerateParams;
 
-    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self {
+    fn generate<'a>(parameters: Option<&'a Self::GenerateParamsType>) -> Self {
         assert!(parameters.is_some());
 
         let InstructionGenerateParams {
@@ -82,12 +82,12 @@ pub struct InstructionGenerateParams {
 }
 
 impl InstructionGenerateParams {
-    pub fn new(registers_len: usize, data_len: usize, executables: Executables) -> Option<Self> {
-        Some(InstructionGenerateParams {
+    pub fn new(registers_len: usize, data_len: usize, executables: Executables) -> Self {
+        InstructionGenerateParams {
             registers_len,
             data_len,
             executables,
-        })
+        }
     }
 }
 

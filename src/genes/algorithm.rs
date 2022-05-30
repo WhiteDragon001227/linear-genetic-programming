@@ -4,18 +4,15 @@ use csv::ReaderBuilder;
 use more_asserts::assert_le;
 use rand::prelude::IteratorRandom;
 
-use crate::utils::alias::{Executables, Inputs};
+use crate::utils::common_traits::{Executables, Inputs};
 
-use super::{
-    characteristics::Organism, population::Population, program::ProgramGenerateParams,
-    registers::ValidInput,
-};
+use super::{characteristics::Organism, population::Population, registers::ValidInput};
 
 #[derive(Clone)]
-pub struct HyperParameters<'a, InputType, DataPathType = String>
+pub struct HyperParameters<OrganismType, DataPathType = String>
 where
     DataPathType: Into<PathBuf>,
-    InputType: ValidInput,
+    OrganismType: Organism,
 {
     pub population_size: usize,
     pub max_program_size: usize,
@@ -23,7 +20,7 @@ where
     pub max_generations: usize,
     pub data_path: DataPathType,
     pub executables: Executables,
-    pub program_params: ProgramGenerateParams<'a, InputType>,
+    pub program_params: OrganismType::GenerateParamsType,
 }
 
 pub trait GeneticAlgorithm<'a>
@@ -53,7 +50,7 @@ where
     }
 
     fn init_population<T>(
-        hyper_params: &HyperParameters<Self::InputType>,
+        hyper_params: &HyperParameters<T>,
         inputs: &Inputs<Self::InputType>,
     ) -> Population<T>
     where
@@ -125,7 +122,7 @@ where
     fn execute<T>(
         data_path: &impl Into<PathBuf>,
         program_params: T::GenerateParamsType,
-        hyper_params: &HyperParameters<Self::InputType>,
+        hyper_params: &HyperParameters<T>,
     ) -> ()
     where
         T: Organism,

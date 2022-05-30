@@ -1,4 +1,4 @@
-use crate::utils::alias::{Compare, Show};
+use crate::utils::common_traits::{Compare, Show};
 
 use super::{chromosomes::Instruction, registers::RegisterValue};
 
@@ -20,7 +20,7 @@ pub trait Mutate: Show {
 pub trait Generate {
     type GenerateParamsType;
 
-    fn generate(parameters: Option<Self::GenerateParamsType>) -> Self;
+    fn generate<'a>(parameters: Option<&'a Self::GenerateParamsType>) -> Self;
 }
 
 pub trait Organism: Fitness + Generate + Compare {

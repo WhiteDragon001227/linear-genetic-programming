@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
-use crate::utils::alias::Compare;
+use crate::utils::common_traits::Compare;
 
 use super::definitions::Metric;
 

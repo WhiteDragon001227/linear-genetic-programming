@@ -1,4 +1,4 @@
-use crate::utils::{alias::Compare, median_heap::MedianHeap};
+use crate::utils::{common_traits::Compare, median_heap::MedianHeap};
 
 use super::definitions::Metric;
 

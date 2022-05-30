@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::utils::alias::Compare;
+use crate::utils::common_traits::Compare;
 
 type InnerPopulation<T> = VecDeque<T>;
 #[derive(Debug, Clone)]
