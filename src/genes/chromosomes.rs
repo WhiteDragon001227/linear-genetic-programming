@@ -34,15 +34,15 @@ impl Distribution<Modes> for Standard {
 }
 
 #[derive(Clone, Serialize)]
-pub struct Instruction {
+pub struct Instruction<'a> {
     pub source_index: usize,
     pub target_index: usize,
     mode: Modes,
     #[serde(skip_serializing)]
-    pub exec: AnyExecutable,
+    pub exec: &'a AnyExecutable,
 }
 
-impl Generate for Instruction {
+impl<'b> Generate for Instruction<'b> {
     type GenerateParamsType = InstructionGenerateParams;
 
     fn generate<'a>(parameters: Option<&'a Self::GenerateParamsType>) -> Self {
@@ -54,7 +54,7 @@ impl Generate for Instruction {
             executables,
         } = parameters.unwrap();
 
-        let source_index = UniformInt::<usize>::new(0, registers_len).sample(GENERATOR);
+        let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut GENERATOR::get());
         let mode = StdRng::from_entropy().sample(Standard);
         let target_index = UniformInt::<usize>::new(
             0,
@@ -65,12 +65,12 @@ impl Generate for Instruction {
             },
         )
         .sample(&mut thread_rng());
-        let exec = executables.choose(GENERATOR).unwrap();
+        let exec = executables.choose(&mut GENERATOR::get()).unwrap();
 
         Instruction {
             source_index,
             target_index,
-            exec: *exec,
+            exec,
             mode,
         }
     }
@@ -91,9 +91,9 @@ impl InstructionGenerateParams {
     }
 }
 
-impl Eq for Instruction {}
+impl<'a> Eq for Instruction<'a> {}
 
-impl PartialEq for Instruction {
+impl<'a> PartialEq for Instruction<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.source_index == other.source_index
             && self.target_index == other.target_index
@@ -102,7 +102,7 @@ impl PartialEq for Instruction {
     }
 }
 
-impl Debug for Instruction {
+impl<'a> Debug for Instruction<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Instruction")
             .field("mode", &self.mode)
@@ -112,7 +112,7 @@ impl Debug for Instruction {
     }
 }
 
-impl Instruction {
+impl<'b> Instruction<'b> {
     pub fn get_data<'a, InputType>(
         &self,
         registers: &'a Registers,
@@ -123,7 +123,7 @@ impl Instruction {
     {
         let target_data: Registers = match self.mode {
             Modes::Registers => registers.clone(),
-            Modes::Input => data.as_registers().clone(),
+            Modes::Input => data.clone().into(),
         };
 
         target_data

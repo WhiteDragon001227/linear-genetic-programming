@@ -1,3 +1,11 @@
-use rand::{prelude::ThreadRng, thread_rng};
+use rand::{Rng, SeedableRng};
 
-pub const GENERATOR: &mut ThreadRng = &mut thread_rng();
+pub const SEED_NO: u64 = 42;
+
+pub struct GENERATOR;
+
+impl GENERATOR {
+    pub fn get() -> impl Rng {
+        rand_chacha::ChaCha8Rng::seed_from_u64(SEED_NO)
+    }
+}

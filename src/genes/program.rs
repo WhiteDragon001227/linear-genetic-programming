@@ -23,7 +23,7 @@ pub struct Program<'a, InputType>
 where
     InputType: ValidInput,
 {
-    pub instructions: Vec<Instruction>,
+    pub instructions: Vec<Instruction<'a>>,
     pub inputs: &'a Inputs<InputType>,
     pub registers: Registers,
     fitness: Option<FitnessScore>,
@@ -82,7 +82,8 @@ where
 
         let registers = Registers::new(InputType::N_CLASSES + 1);
 
-        let n_instructions = UniformInt::<usize>::new(0, max_instructions).sample(GENERATOR);
+        let n_instructions =
+            UniformInt::<usize>::new(0, max_instructions).sample(&mut GENERATOR::get());
 
         let instruction_params = InstructionGenerateParams::new(
             InputType::N_CLASSES,
@@ -90,7 +91,9 @@ where
             executables,
         );
 
-        let instructions: Vec<Instruction> = (0..n_instructions).map(|_| Instruction::generate(Some(&instruction_params))).collect();
+        let instructions: Vec<Instruction> = (0..n_instructions)
+            .map(|_| Instruction::generate(Some(&instruction_params)))
+            .collect();
 
         Program {
             instructions,
