@@ -4,7 +4,10 @@ use csv::ReaderBuilder;
 use more_asserts::assert_le;
 use rand::prelude::IteratorRandom;
 
-use crate::{genes::characteristics::Fitness, utils::common_traits::Inputs};
+use crate::{
+    genes::characteristics::{Fitness, Generate},
+    utils::common_traits::Inputs,
+};
 
 use super::{characteristics::Organism, population::Population, registers::ValidInput};
 
@@ -42,7 +45,7 @@ where
     }
 }
 
-pub trait GeneticAlgorithm<'b>
+pub trait GeneticAlgorithm
 where
     Self::O: Organism,
 {
@@ -56,35 +59,29 @@ where
         let mut population = Population::new(hyper_params.population_size);
 
         for _ in 0..hyper_params.population_size {
-            let program = Self::OrganismType::generate(&hyper_params.program_params);
+            let program = Self::O::generate(&hyper_params.program_params);
             population.push(program)
         }
 
         population
     }
 
-    fn evaluate(population: &'b mut Population<Self::O>) -> &'b mut Population<Self::O> {
+    fn evaluate(population: &mut Population<Self::O>) -> () {
         for individual in population.get_mut_pop() {
-            individual.lazy_fitness();
+            individual.eval_set_fitness();
         }
-
-        population
     }
 
-    fn rank(population: &'b mut Population<Self::O>) -> &'b mut Population<Self::O> {
+    fn rank(population: &mut Population<Self::O>) -> () {
         population.sort();
-        population
     }
 
-    fn apply_selection(
-        population: &'b mut Population<Self::O>,
-        gap: f32,
-    ) -> &'b mut Population<Self::O> {
+    fn apply_selection(population: &mut Population<Self::O>, gap: f32) -> () {
         assert!(gap >= 0f32 && gap <= 1f32);
 
         assert_le!(
-            population.first().unwrap().fitness(),
-            population.last().unwrap().fitness()
+            population.first().unwrap().eval_fitness(),
+            population.last().unwrap().eval_fitness()
         );
 
         let pop_len = population.len();
@@ -94,11 +91,9 @@ where
         for _ in 0..lowest_index {
             population.f_pop();
         }
-
-        population
     }
 
-    fn breed(population: &'b mut Population<Self::O>) -> &'b mut Population<Self::O> {
+    fn breed(population: &mut Population<Self::O>) -> () {
         let pop_cap = population.capacity();
         let pop_len = population.len();
         let remaining_size = pop_cap - pop_len;
@@ -112,8 +107,6 @@ where
         for individual in selected_individuals {
             population.push(individual)
         }
-
-        population
     }
 
     fn execute(hyper_params: &HyperParameters<Self::O>) -> () {}

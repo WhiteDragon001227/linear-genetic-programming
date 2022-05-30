@@ -29,7 +29,7 @@ mod iris_tests {
             characteristics::FitnessScore,
             program::{Program, ProgramGenerateParams},
         },
-        metrics::benchmarks::ComplexityBenchmark,
+        metrics::benchmarks::{Benchmark, ComplexityBenchmark},
     };
 
     use super::iris_data::{IrisLgp, IRIS_DATASET_LINK};
@@ -71,11 +71,14 @@ mod iris_tests {
         let mut generations = 0;
 
         loop {
-            let benchmark = IrisLgp.get_benchmark_individuals();
+            let benchmark = population.get_benchmark_individuals();
             benchmarks.push(benchmark);
             let benchmark_ref = benchmarks.last().unwrap();
 
-            gp.apply_selection().breed().evaluate().rank();
+            IrisLgp::apply_selection(&mut population, hyper_params.gap);
+            IrisLgp::breed(&mut population);
+            IrisLgp::evaluate(&mut population);
+            IrisLgp::rank(&mut population);
 
             if benchmark_ref.worst == benchmark_ref.median
                 && benchmark_ref.median == benchmark_ref.best
@@ -164,27 +167,28 @@ mod iris_tests {
 
         let inputs = IrisLgp::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters {
+        let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
             population_size: 100,
-            max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            executables: todo!(),
-            data_path: todo!(),
-            program_params: todo!(),
+            program_params: ProgramGenerateParams {
+                max_instructions: 100,
+                inputs: &inputs,
+                executables: IRIS_EXECUTABLES,
+            },
         };
 
-        let mut gp = IrisLgp::new(hyper_params, &inputs);
+        let mut population = IrisLgp::init_population(&hyper_params);
 
-        gp.init_population().apply_selection();
+        IrisLgp::apply_selection(&mut population, hyper_params.gap);
 
-        let dropped_pop_len = gp.population.len();
+        let dropped_pop_len = population.len();
 
         assert_lt!(dropped_pop_len, hyper_params.population_size);
 
-        gp.breed();
+        IrisLgp::breed(&mut population);
 
-        assert_eq!(gp.population.len(), hyper_params.population_size);
+        assert_eq!(population.len(), hyper_params.population_size);
 
         Ok(())
     }
@@ -196,22 +200,23 @@ mod iris_tests {
 
         let inputs = IrisLgp::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters {
+        let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
             population_size: 100,
-            max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            executables: todo!(),
-            data_path: todo!(),
-            program_params: todo!(),
+            program_params: ProgramGenerateParams {
+                max_instructions: 100,
+                inputs: &inputs,
+                executables: IRIS_EXECUTABLES,
+            },
         };
 
-        let mut gp = IrisLgp::new(hyper_params, &inputs);
+        let mut population = IrisLgp::init_population(&hyper_params);
 
-        gp.init_population().apply_selection();
+        IrisLgp::apply_selection(&mut population, hyper_params.gap);
 
         self::assert_eq!(
-            gp.population.len(),
+            population.len(),
             ((hyper_params.population_size as f32 * (1f32 - hyper_params.gap)).floor() as i32
                 as usize)
         );
@@ -226,24 +231,26 @@ mod iris_tests {
 
         let inputs = IrisLgp::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters {
+        let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
             population_size: 100,
-            max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            executables: IRIS_EXECUTABLES,
-            data_path: tmp_file.path(),
-            program_params: todo!(),
+            program_params: ProgramGenerateParams {
+                max_instructions: 100,
+                inputs: &inputs,
+                executables: IRIS_EXECUTABLES,
+            },
         };
 
-        let mut gp = IrisLgp::new(hyper_params, &inputs);
+        let population = IrisLgp::init_population(&hyper_params);
 
-        gp.init_population();
+        self::assert_eq!(population.len(), hyper_params.population_size);
 
-        self::assert_eq!(gp.population.len(), hyper_params.population_size);
-
-        for individual in gp.population.get_pop() {
-            assert_le!(individual.instructions.len(), hyper_params.max_program_size)
+        for individual in population.get_pop() {
+            assert_le!(
+                individual.instructions.len(),
+                hyper_params.program_params.max_instructions
+            )
         }
 
         Ok(())
@@ -316,7 +323,7 @@ mod iris_impl {
 
 pub mod iris_data {
     use core::fmt;
-    use std::fmt::Display;
+    use std::{fmt::Display, marker::PhantomData};
 
     use serde::{Deserialize, Serialize};
     use strum::EnumCount;
@@ -353,13 +360,13 @@ pub mod iris_data {
         Virginica = 2,
     }
 
-    pub struct IrisLgp;
+    pub struct IrisLgp<'a>(PhantomData<&'a ()>);
 
-    impl<'a> GeneticAlgorithm<'a> for IrisLgp {
+    impl<'a> GeneticAlgorithm for IrisLgp<'a> {
         type O = Program<'a, IrisInput>;
     }
 
-    impl Loader for IrisLgp {
+    impl<'a> Loader for IrisLgp<'a> {
         type InputType = IrisInput;
     }
 

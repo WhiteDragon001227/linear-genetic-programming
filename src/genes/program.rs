@@ -34,9 +34,9 @@ pub struct ProgramGenerateParams<'a, InputType>
 where
     InputType: ValidInput,
 {
-    inputs: &'a Inputs<InputType>,
-    max_instructions: usize,
-    executables: Executables,
+    pub inputs: &'a Inputs<InputType>,
+    pub max_instructions: usize,
+    pub executables: Executables,
 }
 
 impl<'a, InputType> Display for Program<'a, InputType>
@@ -108,7 +108,7 @@ impl<'a, InputType> Fitness for Program<'a, InputType>
 where
     InputType: ValidInput,
 {
-    fn fitness(&self) -> FitnessScore {
+    fn eval_fitness(&self) -> FitnessScore {
         let inputs = self.inputs;
 
         let mut fitness: Accuracy<Option<usize>> = Accuracy::new();
@@ -134,8 +134,12 @@ where
         fitness.calculate()
     }
 
-    fn lazy_fitness(&mut self) -> FitnessScore {
-        *self.fitness.get_or_insert(self.fitness())
+    fn eval_set_fitness(&mut self) -> FitnessScore {
+        *self.fitness.get_or_insert(self.eval_fitness())
+    }
+
+    fn get_fitness(&self) -> Option<FitnessScore> {
+        self.fitness
     }
 }
 

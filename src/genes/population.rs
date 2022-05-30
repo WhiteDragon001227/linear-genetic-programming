@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 
-use crate::utils::common_traits::Compare;
+use crate::{metrics::benchmarks::Benchmark, utils::common_traits::Compare};
+
+use super::characteristics::{FitnessScore, Organism};
 
 type InnerPopulation<T> = VecDeque<T>;
 #[derive(Debug, Clone)]
@@ -64,5 +66,24 @@ where
 
     pub fn capacity(&self) -> usize {
         self.1
+    }
+}
+
+impl<T> Benchmark for Population<T>
+where
+    T: Organism,
+{
+    type InputType = FitnessScore;
+
+    fn get_worst(&self) -> Option<Self::InputType> {
+        self.first().unwrap().get_fitness()
+    }
+
+    fn get_median(&self) -> Option<Self::InputType> {
+        self.middle().unwrap().get_fitness()
+    }
+
+    fn get_best(&self) -> Option<Self::InputType> {
+        self.last().unwrap().get_fitness()
     }
 }

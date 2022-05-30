@@ -5,8 +5,9 @@ use super::{chromosomes::Instruction, registers::RegisterValue};
 pub type FitnessScore = RegisterValue;
 
 pub trait Fitness: Show {
-    fn fitness(&self) -> FitnessScore;
-    fn lazy_fitness(&mut self) -> FitnessScore;
+    fn eval_fitness(&self) -> FitnessScore;
+    fn eval_set_fitness(&mut self) -> FitnessScore;
+    fn get_fitness(&self) -> Option<FitnessScore>;
 }
 
 pub trait Breed: Show {
