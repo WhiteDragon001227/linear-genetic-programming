@@ -25,13 +25,14 @@ mod iris_tests {
     use crate::{
         data::iris::{iris_data::IrisInput, iris_ops::IRIS_EXECUTABLES},
         genes::{
-            algorithm::{GeneticAlgorithm, HyperParameters},
+            algorithm::{GeneticAlgorithm, HyperParameters, Loader},
             characteristics::FitnessScore,
+            program::{Program, ProgramGenerateParams},
         },
         metrics::benchmarks::ComplexityBenchmark,
     };
 
-    use super::iris_data::{IrisLinearGeneticProgramming, IRIS_DATASET_LINK};
+    use super::iris_data::{IrisLgp, IRIS_DATASET_LINK};
     use more_asserts::{assert_le, assert_lt};
     use plotters::{
         prelude::{BitMapBackend, ChartBuilder, IntoDrawingArea, LineSeries, PathElement},
@@ -44,24 +45,25 @@ mod iris_tests {
     #[tokio::test]
     async fn given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness(
     ) -> Result<(), Box<dyn error::Error>> {
-        IrisLinearGeneticProgramming::init_env();
+        IrisLgp::init_env();
 
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
+        let inputs = IrisLgp::load_inputs(tmp_file.path());
 
-        let hyper_params = HyperParameters {
+        let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
             population_size: 100,
-            max_program_size: 100,
             gap: 0.5,
             max_generations: 100,
-            executables: IRIS_EXECUTABLES,
-            data_path: tmp_file.path(),
-            program_params: todo!(),
+            program_params: ProgramGenerateParams {
+                max_instructions: 100,
+                inputs: &inputs,
+                executables: IRIS_EXECUTABLES,
+            },
         };
 
-        let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
-        let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
-
-        gp.init_population().evaluate().rank();
+        let mut population = IrisLgp::init_population(&hyper_params);
+        IrisLgp::evaluate(&mut population);
+        IrisLgp::rank(&mut population);
 
         const PLOT_FILE_NAME: &'static str = "/tmp/tests/plots/given_lgp_instance_when_sufficient_iterations_have_been_used_then_population_contains_the_same_benchmark_fitness.png";
 
@@ -69,7 +71,7 @@ mod iris_tests {
         let mut generations = 0;
 
         loop {
-            let benchmark = gp.get_benchmark_individuals();
+            let benchmark = IrisLgp.get_benchmark_individuals();
             benchmarks.push(benchmark);
             let benchmark_ref = benchmarks.last().unwrap();
 
@@ -160,7 +162,7 @@ mod iris_tests {
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
 
-        let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
+        let inputs = IrisLgp::load_inputs(tmp_file.path());
 
         let hyper_params = HyperParameters {
             population_size: 100,
@@ -172,7 +174,7 @@ mod iris_tests {
             program_params: todo!(),
         };
 
-        let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
+        let mut gp = IrisLgp::new(hyper_params, &inputs);
 
         gp.init_population().apply_selection();
 
@@ -192,7 +194,7 @@ mod iris_tests {
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
 
-        let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
+        let inputs = IrisLgp::load_inputs(tmp_file.path());
 
         let hyper_params = HyperParameters {
             population_size: 100,
@@ -204,7 +206,7 @@ mod iris_tests {
             program_params: todo!(),
         };
 
-        let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
+        let mut gp = IrisLgp::new(hyper_params, &inputs);
 
         gp.init_population().apply_selection();
 
@@ -222,7 +224,7 @@ mod iris_tests {
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmp_file) = get_iris_content().await?;
 
-        let inputs = IrisLinearGeneticProgramming::load_inputs(tmp_file.path());
+        let inputs = IrisLgp::load_inputs(tmp_file.path());
 
         let hyper_params = HyperParameters {
             population_size: 100,
@@ -234,7 +236,7 @@ mod iris_tests {
             program_params: todo!(),
         };
 
-        let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
+        let mut gp = IrisLgp::new(hyper_params, &inputs);
 
         gp.init_population();
 
@@ -276,7 +278,7 @@ mod iris_tests {
     async fn given_iris_dataset_when_csv_path_is_provided_then_collection_of_iris_structs_are_returned(
     ) -> Result<(), Box<dyn error::Error>> {
         let ContentFilePair(_, tmpfile) = get_iris_content().await?;
-        let inputs = IrisLinearGeneticProgramming::load_inputs(tmpfile.path());
+        let inputs = IrisLgp::load_inputs(tmpfile.path());
         assert_ne!(inputs.len(), 0);
         Ok(())
     }
@@ -320,7 +322,8 @@ pub mod iris_data {
     use strum::EnumCount;
 
     use crate::genes::{
-        algorithm::GeneticAlgorithm,
+        algorithm::{GeneticAlgorithm, Loader},
+        program::Program,
         registers::{RegisterValue, Registers, ValidInput},
     };
 
@@ -350,9 +353,13 @@ pub mod iris_data {
         Virginica = 2,
     }
 
-    pub struct IrisLinearGeneticProgramming;
+    pub struct IrisLgp;
 
-    impl<'a> GeneticAlgorithm<'a> for IrisLinearGeneticProgramming {
+    impl<'a> GeneticAlgorithm<'a> for IrisLgp {
+        type O = Program<'a, IrisInput>;
+    }
+
+    impl Loader for IrisLgp {
         type InputType = IrisInput;
     }
 
