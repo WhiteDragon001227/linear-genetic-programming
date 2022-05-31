@@ -147,6 +147,8 @@ async fn given_population_when_breeding_occurs_then_population_capacity_is_met(
 
     let mut population = IrisLgp::init_population(&hyper_params);
 
+    IrisLgp::evaluate(&mut population);
+    IrisLgp::rank(&mut population);
     IrisLgp::apply_selection(&mut population, hyper_params.gap);
 
     let dropped_pop_len = population.len();
@@ -180,6 +182,8 @@ async fn given_population_and_retention_rate_when_selection_occurs_then_populati
 
     let mut population = IrisLgp::init_population(&hyper_params);
 
+    IrisLgp::evaluate(&mut population);
+    IrisLgp::rank(&mut population);
     IrisLgp::apply_selection(&mut population, hyper_params.gap);
 
     self::assert_eq!(
