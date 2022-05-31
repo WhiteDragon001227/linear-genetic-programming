@@ -9,9 +9,11 @@ use crate::{
     utils::common_traits::Inputs,
 };
 
+use log::trace;
+
 use super::{characteristics::Organism, population::Population, registers::ValidInput};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HyperParameters<OrganismType>
 where
     OrganismType: Organism,
@@ -112,6 +114,8 @@ where
     // TODO: Add hooks?
     fn execute(hyper_params: &HyperParameters<Self::O>) -> Population<Self::O> {
         Self::init_env();
+
+        trace!("{:#?}", hyper_params);
 
         let mut population = Self::init_population(hyper_params);
 

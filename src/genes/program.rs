@@ -29,13 +29,14 @@ where
     fitness: Option<FitnessScore>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ProgramGenerateParams<'a, InputType>
 where
     InputType: ValidInput,
 {
     pub inputs: &'a Inputs<InputType>,
     pub max_instructions: usize,
+    #[serde(skip_serializing)]
     pub executables: Executables,
 }
 
@@ -74,7 +75,7 @@ where
     type GenerateParamsType = ProgramGenerateParams<'a, InputType>;
 
     fn generate<'b>(parameters: &'b Self::GenerateParamsType) -> Self {
-        let ProgramGenerateParams {
+        let &ProgramGenerateParams {
             max_instructions,
             inputs,
             executables,

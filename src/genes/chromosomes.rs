@@ -73,9 +73,12 @@ impl<'b> Generate for Instruction<'b> {
         }
     }
 }
+
+#[derive(Clone, Debug, Serialize)]
 pub struct InstructionGenerateParams {
     registers_len: usize,
     data_len: usize,
+    #[serde(skip_serializing)]
     executables: Executables,
 }
 

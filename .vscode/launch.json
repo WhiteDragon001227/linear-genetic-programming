@@ -20,11 +20,11 @@
       "name": "Launch",
       "cargo": {
         "args": [
-          "run",
+          "build",
         ]
       },
-      "cwd": "${workspaceFolder}",
-      "args": []
+      "args": [],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

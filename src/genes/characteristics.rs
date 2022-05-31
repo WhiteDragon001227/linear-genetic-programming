@@ -18,12 +18,15 @@ pub trait Mutate: Show {
     fn mutate(&mut self) -> () {}
 }
 
-pub trait Generate {
+pub trait Generate
+where
+    Self::GenerateParamsType: Show,
+{
     type GenerateParamsType;
 
     fn generate<'a>(parameters: &'a Self::GenerateParamsType) -> Self;
 }
 
-pub trait Organism: Fitness + Generate + Compare {
+pub trait Organism: Fitness + Generate + Compare + Show {
     fn get_instructions(&self) -> &[Instruction];
 }

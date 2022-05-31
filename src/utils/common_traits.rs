@@ -1,5 +1,4 @@
 use core::fmt;
-use std::fmt::Display;
 
 use serde::Serialize;
 
@@ -30,6 +29,6 @@ impl fmt::Debug for AnyExecutable {
 pub type Executables = &'static [AnyExecutable];
 
 pub trait Compare<V = Self> = PartialEq<V> + Eq + PartialOrd + Ord where V: Clone;
-pub trait Show = fmt::Debug + Display + Serialize;
+pub trait Show = fmt::Debug + Serialize;
 
 pub type Inputs<InputType> = Vec<InputType>;
