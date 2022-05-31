@@ -10,8 +10,8 @@ pub trait Fitness: Show {
     fn get_fitness(&self) -> Option<FitnessScore>;
 }
 
-pub trait Breed: Show {
-    fn crossover(&self, other: &Self) -> Self;
+pub trait Breed: Show + Clone {
+    fn uniform_crossover(&self, mate: &Self) -> [Self; 2];
 }
 
 pub trait Mutate: Show {
@@ -24,7 +24,7 @@ where
 {
     type GenerateParamsType;
 
-    fn generate<'a>(parameters: &'a Self::GenerateParamsType) -> Self;
+    fn generate(parameters: &Self::GenerateParamsType) -> Self;
 }
 
 pub trait Organism: Fitness + Generate + Compare + Show + Sized + Clone {

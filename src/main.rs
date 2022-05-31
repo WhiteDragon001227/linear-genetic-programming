@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
         population_size: 1000,
         gap: 0.5,
-        max_generations: 100,
+        max_generations: 5,
         program_params: ProgramGenerateParams {
             inputs: &inputs,
             max_instructions: 100,

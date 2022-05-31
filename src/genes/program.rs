@@ -79,7 +79,7 @@ where
 {
     type GenerateParamsType = ProgramGenerateParams<'a, InputType>;
 
-    fn generate<'b>(parameters: &'b Self::GenerateParamsType) -> Self {
+    fn generate(parameters: &Self::GenerateParamsType) -> Self {
         let &ProgramGenerateParams {
             max_instructions,
             inputs,

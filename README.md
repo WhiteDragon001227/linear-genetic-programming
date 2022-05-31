@@ -9,34 +9,40 @@ A framework for implementing algorithms involving Linear Genetic Programming.
 - [Metrics](src/metrics)
 - [Data](src/data)
 - [Genes](src/genes)
+- [Utils](src/utils)
 
 ## Examples
 
 ### Iris Dataset Implementation
 
 ```rust
-  fn main() {
-    IrisLinearGeneticProgramming::env_init();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn error::Error>> {
+    let ContentFilePair(_, file) = get_iris_content().await?;
+    let inputs = IrisLgp::load_inputs(file.path());
 
-    let hyper_params = HyperParameters {
+    let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
         population_size: 1000,
-        max_program_size: 100,
         gap: 0.5,
-        max_generations: 100,
+        max_generations: 5,
+        program_params: ProgramGenerateParams {
+            inputs: &inputs,
+            max_instructions: 100,
+            executables: IRIS_EXECUTABLES,
+        },
     };
 
-    let inputs = IrisLinearGeneticProgramming::load_inputs("./data.csv");
-    let mut gp = IrisLinearGeneticProgramming::new(hyper_params, &inputs);
-
-    gp.init_population().eval_population();
-
-    for _ in 0..hyper_params.max_generations {
-        gp.apply_selection().breed();
-    }
-
-    println!(
-        "Best Fitness: {}",
-        gp.population.last().unwrap().fitness.unwrap()
-    );
-  }
+    IrisLgp::execute(&hyper_params);
+    Ok(())
+}
 ```
+
+## Building
+
+Requirements:
+- Cargo
+- Stable Rust 
+
+## Contributions
+
+Contributions are welcomed. The guidelines can be found in [CONTRIBUTING.md](./CONTRIBUTING.md).
