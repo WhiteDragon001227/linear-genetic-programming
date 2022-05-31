@@ -1,5 +1,3 @@
-#![feature(trait_alias)]
-
 use std::error;
 
 use lgp::{
@@ -21,11 +19,6 @@ struct T(pub usize, pub usize);
 async fn main() -> Result<(), Box<dyn error::Error>> {
     let ContentFilePair(_, file) = get_iris_content().await?;
     let inputs = IrisLgp::load_inputs(file.path());
-    let x = T(0, 0);
-    let mut y: Vec<usize> = Vec::new();
-    y.push(0);
-    y.push(1);
-    y.push(2);
 
     let hyper_params: HyperParameters<Program<IrisInput>> = HyperParameters {
         population_size: 1000,

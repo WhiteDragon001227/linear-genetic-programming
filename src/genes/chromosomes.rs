@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use strum::EnumCount;
 
-use crate::utils::common_traits::{AnyExecutable, Executables};
+use crate::utils::common_traits::{AnyExecutable, Executables, Show};
 use crate::utils::random::GENERATOR;
 
 use super::characteristics::Generate;
@@ -112,6 +112,9 @@ impl<'a> Debug for Instruction<'a> {
             .finish()
     }
 }
+
+impl<'b> Show for Instruction<'b> {}
+impl Show for InstructionGenerateParams {}
 
 impl<'b> Instruction<'b> {
     pub fn get_data<'a, InputType>(

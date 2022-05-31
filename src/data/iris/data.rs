@@ -4,10 +4,13 @@ use std::{fmt::Display, marker::PhantomData};
 use serde::{Deserialize, Serialize};
 use strum::EnumCount;
 
-use crate::genes::{
-    algorithm::{GeneticAlgorithm, Loader},
-    program::Program,
-    registers::{RegisterValue, Registers, ValidInput},
+use crate::{
+    genes::{
+        algorithm::{GeneticAlgorithm, Loader},
+        program::Program,
+        registers::{RegisterValue, Registers, ValidInput},
+    },
+    utils::common_traits::{Compare, Show},
 };
 
 pub const IRIS_DATASET_LINK: &'static str =
@@ -61,6 +64,9 @@ impl Display for IrisInput {
         f.write_str(&serialized)
     }
 }
+
+impl Show for IrisInput {}
+impl Compare for IrisInput {}
 
 impl ValidInput for IrisInput {
     const N_CLASSES: usize = 3;

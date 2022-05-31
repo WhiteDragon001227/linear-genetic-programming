@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
-use crate::{genes::registers::RegisterValue, utils::common_traits::Compare};
+use crate::genes::registers::RegisterValue;
 
 use super::definitions::Metric;
 
@@ -32,7 +32,7 @@ struct OccuranceCounter<T>(RunningCounter, PhantomData<T>);
 
 impl<K> OccuranceCounter<K>
 where
-    K: Compare + Hash,
+    K: Hash + PartialEq + Eq + PartialOrd + Ord,
 {
     fn new() -> Self {
         OccuranceCounter(RunningCounter(0, 0), PhantomData)
@@ -41,7 +41,7 @@ where
 
 impl<K> Metric for OccuranceCounter<K>
 where
-    K: Compare + Hash,
+    K: Hash + PartialEq + Eq + PartialOrd + Ord + Clone,
 {
     type ObservableType = ComparablePair<K>;
     type ResultType = [usize; 2];
@@ -62,11 +62,11 @@ where
 
 pub struct Accuracy<K>(HashMap<K, OccuranceCounter<K>>)
 where
-    K: Compare + Hash;
+    K: Hash + PartialEq + Eq + PartialOrd + Ord;
 
 impl<K> Accuracy<K>
 where
-    K: Compare + Hash,
+    K: Hash + PartialEq + Eq + PartialOrd + Ord + Clone,
 {
     pub fn new() -> Self {
         Accuracy(HashMap::<K, OccuranceCounter<K>>::new())
@@ -75,7 +75,7 @@ where
 
 impl<K> Metric for Accuracy<K>
 where
-    K: Compare + Hash,
+    K: Hash + PartialEq + Eq + PartialOrd + Ord + Clone,
 {
     type ObservableType = ComparablePair<K>;
     type ResultType = RegisterValue;

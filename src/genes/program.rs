@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::metrics::definitions::Metric;
+use crate::{
+    metrics::definitions::Metric,
+    utils::common_traits::{Compare, Show},
+};
 use rand::distributions::uniform::{UniformInt, UniformSampler};
 use serde::Serialize;
 
@@ -39,6 +42,8 @@ where
     #[serde(skip_serializing)]
     pub executables: Executables,
 }
+
+impl<'a, InputType> Show for ProgramGenerateParams<'a, InputType> where InputType: ValidInput {}
 
 impl<'a, InputType> Display for Program<'a, InputType>
 where
@@ -143,6 +148,10 @@ where
         self.fitness
     }
 }
+
+impl<'a, InputType> Show for Program<'a, InputType> where InputType: ValidInput {}
+
+impl<'a, InputType> Compare for Program<'a, InputType> where InputType: ValidInput {}
 
 impl<'a, InputType> Organism for Program<'a, InputType>
 where
