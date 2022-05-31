@@ -6,7 +6,7 @@ use super::characteristics::{FitnessScore, Organism};
 
 type InnerPopulation<T> = VecDeque<T>;
 #[derive(Debug, Clone)]
-pub struct Population<T>(InnerPopulation<T>, usize)
+pub struct Population<T>(pub InnerPopulation<T>, usize)
 where
     T: Compare;
 

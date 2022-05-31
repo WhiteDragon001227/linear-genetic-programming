@@ -2,17 +2,17 @@ use std::fmt::Display;
 
 use crate::{
     metrics::definitions::Metric,
-    utils::common_traits::{Compare, Show},
+    utils::{
+        common_traits::{Compare, Show},
+        random::generator,
+    },
 };
 use rand::distributions::uniform::{UniformInt, UniformSampler};
 use serde::Serialize;
 
 use crate::{
     metrics::accuracy::Accuracy,
-    utils::{
-        common_traits::{Executables, Inputs},
-        random::GENERATOR,
-    },
+    utils::common_traits::{Executables, Inputs},
 };
 
 use super::{
@@ -88,8 +88,7 @@ where
 
         let registers = Registers::new(InputType::N_CLASSES + 1);
 
-        let n_instructions =
-            UniformInt::<usize>::new(0, max_instructions).sample(&mut GENERATOR::get());
+        let n_instructions = UniformInt::<usize>::new(0, max_instructions).sample(&mut generator());
 
         let instruction_params = InstructionGenerateParams::new(
             InputType::N_CLASSES,

@@ -10,7 +10,7 @@ use std::fmt::Formatter;
 use strum::EnumCount;
 
 use crate::utils::common_traits::{AnyExecutable, Executables, Show};
-use crate::utils::random::GENERATOR;
+use crate::utils::random::generator;
 
 use super::characteristics::Generate;
 use super::registers::{Registers, ValidInput};
@@ -52,7 +52,7 @@ impl<'b> Generate for Instruction<'b> {
             executables,
         } = parameters;
 
-        let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut GENERATOR::get());
+        let source_index = UniformInt::<usize>::new(0, registers_len).sample(&mut generator());
         let mode = StdRng::from_entropy().sample(Standard);
         let target_index = UniformInt::<usize>::new(
             0,
@@ -63,7 +63,7 @@ impl<'b> Generate for Instruction<'b> {
             },
         )
         .sample(&mut thread_rng());
-        let exec = executables.choose(&mut GENERATOR::get()).unwrap();
+        let exec = executables.choose(&mut generator()).unwrap();
 
         Instruction {
             source_index,
