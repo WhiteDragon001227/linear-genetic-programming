@@ -8,7 +8,7 @@ use lgp::{
     },
     genes::{
         algorithm::{GeneticAlgorithm, HyperParameters, Loader},
-        program::{Program, ProgramGenerateParams},
+        individuals::{Program, ProgramGenerateParams},
     },
 };
 

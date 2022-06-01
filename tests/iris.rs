@@ -5,7 +5,7 @@ use lgp::{
     genes::{
         algorithm::{GeneticAlgorithm, HyperParameters, Loader},
         characteristics::FitnessScore,
-        program::{Program, ProgramGenerateParams},
+        individuals::{Program, ProgramGenerateParams},
     },
     metrics::benchmarks::{Benchmark, ComplexityBenchmark},
 };
