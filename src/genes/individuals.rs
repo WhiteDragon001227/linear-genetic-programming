@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::LinkedList, fmt::Display};
 
 use crate::{
     metrics::definitions::Metric,
@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    characteristics::{Fitness, FitnessScore, Generate, Organism},
+    characteristics::{Breed, Fitness, FitnessScore, Generate, Instructions, Organism},
     chromosomes::{Instruction, InstructionGenerateParams},
     registers::{Registers, ValidInput},
 };
@@ -26,7 +26,7 @@ pub struct Program<'a, InputType>
 where
     InputType: ValidInput,
 {
-    pub instructions: Vec<Instruction<'a>>,
+    pub instructions: Instructions,
     pub inputs: &'a Inputs<InputType>,
     pub registers: Registers,
     fitness: Option<FitnessScore>,
@@ -96,7 +96,7 @@ where
             executables,
         );
 
-        let instructions: Vec<Instruction> = (0..n_instructions)
+        let instructions: LinkedList<Instruction> = (0..n_instructions)
             .map(|_| Instruction::generate(&instruction_params))
             .collect();
 
@@ -156,7 +156,41 @@ impl<'a, InputType> Organism for Program<'a, InputType>
 where
     InputType: ValidInput,
 {
-    fn get_instructions(&self) -> &[crate::genes::chromosomes::Instruction] {
+    fn get_instructions(&self) -> &Instructions {
         &self.instructions
+    }
+}
+
+impl<'a, InputType> Breed for Program<'a, InputType>
+where
+    InputType: ValidInput,
+{
+    fn uniform_crossover(&self, mate: &Self) -> [Self; 2] {
+        let [child_a_instructions, child_b_instructions] =
+            self.instructions.uniform_crossover(&mate.instructions);
+        todo!()
+    }
+}
+
+impl<'a> Breed for Instructions {
+    fn uniform_crossover(&self, mate: &Self) -> [Self; 2] {
+        let mut instructions_a = self.clone();
+        let mut instructions_b = mate.clone();
+
+        let [shortest_set, longest_set] = if instructions_a.len() > instructions_b.len() {
+            [instructions_b, instructions_a]
+        } else {
+            [instructions_a, instructions_b]
+        };
+
+        for index in 0..longest_set.len() {
+            if index < shortest_set.len() {
+                todo!("swap")
+            } else {
+                todo!("add long to short if True")
+            }
+        }
+
+        todo!()
     }
 }

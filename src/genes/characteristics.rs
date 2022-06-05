@@ -1,8 +1,13 @@
+use std::collections::LinkedList;
+
 use crate::utils::common_traits::{Compare, Show};
 
 use super::{chromosomes::Instruction, registers::RegisterValue};
 
 pub type FitnessScore = RegisterValue;
+
+// TODO: Use Linked List
+pub type Instructions = LinkedList<Instruction>;
 
 pub trait Fitness: Show {
     fn eval_fitness(&self) -> FitnessScore;
@@ -10,7 +15,7 @@ pub trait Fitness: Show {
     fn get_fitness(&self) -> Option<FitnessScore>;
 }
 
-pub trait Breed: Show + Clone {
+pub trait Breed: Clone {
     fn uniform_crossover(&self, mate: &Self) -> [Self; 2];
 }
 
@@ -28,5 +33,5 @@ where
 }
 
 pub trait Organism: Fitness + Generate + Compare + Show + Sized + Clone {
-    fn get_instructions(&self) -> &[Instruction];
+    fn get_instructions(&self) -> &Instructions;
 }

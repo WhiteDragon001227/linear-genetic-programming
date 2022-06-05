@@ -34,15 +34,15 @@ impl Distribution<Modes> for Standard {
 }
 
 #[derive(Clone, Serialize)]
-pub struct Instruction<'a> {
+pub struct Instruction {
     pub source_index: usize,
     pub target_index: usize,
     mode: Modes,
     #[serde(skip_serializing)]
-    pub exec: &'a AnyExecutable,
+    pub exec: AnyExecutable,
 }
 
-impl<'b> Generate for Instruction<'b> {
+impl Generate for Instruction {
     type GenerateParamsType = InstructionGenerateParams;
 
     fn generate<'a>(parameters: &'a Self::GenerateParamsType) -> Self {
@@ -92,9 +92,9 @@ impl InstructionGenerateParams {
     }
 }
 
-impl<'a> Eq for Instruction<'a> {}
+impl Eq for Instruction {}
 
-impl<'a> PartialEq for Instruction<'a> {
+impl PartialEq for Instruction {
     fn eq(&self, other: &Self) -> bool {
         self.source_index == other.source_index
             && self.target_index == other.target_index
@@ -103,7 +103,7 @@ impl<'a> PartialEq for Instruction<'a> {
     }
 }
 
-impl<'a> Debug for Instruction<'a> {
+impl Debug for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Instruction")
             .field("mode", &self.mode)
@@ -113,10 +113,10 @@ impl<'a> Debug for Instruction<'a> {
     }
 }
 
-impl<'b> Show for Instruction<'b> {}
+impl Show for Instruction {}
 impl Show for InstructionGenerateParams {}
 
-impl<'b> Instruction<'b> {
+impl Instruction {
     pub fn get_data<'a, InputType>(
         &self,
         registers: &'a Registers,
