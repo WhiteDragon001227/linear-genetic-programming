@@ -63,7 +63,8 @@ impl Generate for Instruction {
             },
         )
         .sample(&mut thread_rng());
-        let exec = executables.choose(&mut generator()).unwrap();
+
+        let exec = executables.choose(&mut generator()).unwrap().to_owned();
 
         Instruction {
             source_index,
